@@ -3,11 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Bell, Heart, MessageCircle, ChevronDown, Sun, Moon,
-  User, Settings, LogOut, Plus, Menu, X, Package, Shield, LayoutDashboard
+  Settings, LogOut, Plus, Menu, X, Package, LayoutDashboard
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Avatar, Badge, Modal } from '../ui';
+import { Avatar, Modal } from '../ui';
 import { CATEGORIES } from '../../utils/constants';
 import Icon from '../ui/Icon';
 import { notificationsService } from '../../services';
@@ -87,267 +87,276 @@ const Header: React.FC = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm relative">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center h-16 gap-3">
-          {/* Logo */}
-          {userHasAnyRole(user, ['moderator', 'admin', 'super_admin']) ? (
-            <Link to={getDashboardPath()} className="flex items-center gap-2 shrink-0">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-accent-500 rounded-xl flex items-center justify-center">
-                <Package size={16} className="text-white" />
-              </div>
-              <span className="text-xl font-bold text-gradient hidden sm:block">All in one</span>
-            </Link>
-          ) : (
-            <Link to="/" className="flex items-center gap-2 shrink-0">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-accent-500 rounded-xl flex items-center justify-center">
-                <Package size={16} className="text-white" />
-              </div>
-              <span className="text-xl font-bold text-gradient hidden sm:block">All in one</span>
-            </Link>
-          )}
+      <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm relative">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4">
+          <div className="flex items-center justify-between h-16 gap-2 sm:gap-3">
+            {/* Logo + Categories */}
+            <div className="flex items-center gap-2 shrink-0">
+              <Link to={userHasAnyRole(user, ['moderator', 'admin', 'super_admin']) ? getDashboardPath() : "/"} className="flex items-center gap-2 shrink-0">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-primary-500 to-accent-500 rounded-xl flex items-center justify-center shrink-0">
+                  <Package size={18} className="text-white" />
+                </div>
+                <span className="text-lg sm:text-xl font-bold text-gradient hidden xs:inline sm:inline">All in one</span>
+              </Link>
 
-          {/* Categories dropdown */}
-          {!userHasAnyRole(user, ['moderator', 'admin', 'super_admin']) && (
-            <div className="relative hidden lg:block">
-              <button
-                onClick={() => setCategoryMenuOpen(!categoryMenuOpen)}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
-              >
-                <Menu size={16} />
-                Categories
-                <ChevronDown size={14} />
-              </button>
-              <AnimatePresence>
-                {categoryMenuOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    className="absolute top-full left-0 mt-1 w-72 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl overflow-hidden z-50"
-                    onMouseLeave={() => setCategoryMenuOpen(false)}
+              {/* Categories dropdown (desktop) */}
+              {!userHasAnyRole(user, ['moderator', 'admin', 'super_admin']) && (
+                <div className="relative hidden lg:block">
+                  <button
+                    onClick={() => setCategoryMenuOpen(!categoryMenuOpen)}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
                   >
-                    <div className="p-2 grid grid-cols-1 gap-0.5 max-h-96 overflow-y-auto">
-                      {CATEGORIES.map(cat => (
-                        <Link
-                          key={cat.id}
-                          to={`/category/${cat.slug}`}
-                          onClick={() => setCategoryMenuOpen(false)}
-                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                        >
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: cat.color + '20' }}>
-                            <Icon name={cat.icon} size={16} style={{ color: cat.color }} />
-                          </div>
-                          <span className="text-sm text-slate-700 dark:text-slate-300">{cat.name}</span>
-                        </Link>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
-
-          {/* Search - Available for regular users */}
-          {!userHasAnyRole(user, ['moderator', 'admin', 'super_admin']) && (
-            <form onSubmit={handleSearch} className="flex-1 max-w-xl">
-              <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Search for anything..."
-                  className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent focus:bg-white dark:focus:bg-slate-700 transition-all"
-                />
-              </div>
-            </form>
-          )}
-
-          {/* Right actions */}
-          <div className="flex items-center gap-2">
-            {user ? (
-              <>
-                {/* Messages */}
-                {!userHasAnyRole(user, ['moderator', 'admin', 'super_admin']) && (
-                  <Link
-                    to="/chat"
-                    className="relative p-2 rounded-xl text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all mr-1"
-                  >
-                    <MessageCircle size={18} />
-                    {totalUnread > 0 && (
-                      <motion.span
-                        key={totalUnread}
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="absolute top-0.5 right-0.5 min-w-[16px] h-4 bg-primary-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none px-0.5"
+                    <Menu size={16} />
+                    Categories
+                    <ChevronDown size={14} />
+                  </button>
+                  <AnimatePresence>
+                    {categoryMenuOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 8 }}
+                        className="absolute top-full left-0 mt-1 w-72 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl overflow-hidden z-50"
+                        onMouseLeave={() => setCategoryMenuOpen(false)}
                       >
-                        {totalUnread > 9 ? '9+' : totalUnread}
-                      </motion.span>
+                        <div className="p-2 grid grid-cols-1 gap-0.5 max-h-96 overflow-y-auto">
+                          {CATEGORIES.map(cat => (
+                            <Link
+                              key={cat.id}
+                              to={`/category/${cat.slug}`}
+                              onClick={() => setCategoryMenuOpen(false)}
+                              className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                            >
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: cat.color + '20' }}>
+                                <Icon name={cat.icon} size={16} style={{ color: cat.color }} />
+                              </div>
+                              <span className="text-sm text-slate-700 dark:text-slate-300">{cat.name}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      </motion.div>
                     )}
-                  </Link>
-                )}
+                  </AnimatePresence>
+                </div>
+              )}
+            </div>
 
-                {/* Sell button */}
-                {!userHasAnyRole(user, ['moderator', 'admin', 'super_admin']) && (
+            {/* Search - Desktop inline search */}
+            {!userHasAnyRole(user, ['moderator', 'admin', 'super_admin']) && (
+              <form onSubmit={handleSearch} className="flex-1 max-w-xl hidden md:block">
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Search for anything..."
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent focus:bg-white dark:focus:bg-slate-700 transition-all"
+                  />
+                </div>
+              </form>
+            )}
+
+            {/* Right actions */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {user ? (
+                <>
+                  {/* Messages */}
+                  {!userHasAnyRole(user, ['moderator', 'admin', 'super_admin']) && (
+                    <Link
+                      to="/chat"
+                      className="relative p-2 rounded-xl text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shrink-0"
+                      title="Messages"
+                    >
+                      <MessageCircle size={18} />
+                      {totalUnread > 0 && (
+                        <motion.span
+                          key={totalUnread}
+                          initial={{ scale: 0.5, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          className="absolute top-0.5 right-0.5 min-w-[16px] h-4 bg-primary-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none px-0.5"
+                        >
+                          {totalUnread > 9 ? '9+' : totalUnread}
+                        </motion.span>
+                      )}
+                    </Link>
+                  )}
+
+                  {/* Notifications */}
+                  <button
+                    onClick={() => setNotifModalOpen(true)}
+                    className="relative p-2 rounded-xl text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shrink-0"
+                    title="Notifications"
+                  >
+                    <Bell size={18} />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-medium leading-none">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Sell button */}
+                  {!userHasAnyRole(user, ['moderator', 'admin', 'super_admin']) && (
+                    <Link
+                      to="/dashboard/listings/new"
+                      className="btn-accent text-xs sm:text-sm py-1.5 px-2.5 sm:px-4 flex items-center gap-1.5 shadow-sm hover:shadow transition-all shrink-0"
+                    >
+                      <Plus size={16} />
+                      <span className="hidden sm:inline font-semibold">Sell</span>
+                    </Link>
+                  )}
+
+                  {/* Profile Menu Trigger */}
+                  <div className="relative shrink-0">
+                    <button
+                      onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                      className="flex items-center gap-1 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-200 dark:border-slate-700 shrink-0"
+                    >
+                      <Avatar src={user.avatar_url} name={user.full_name} size="sm" />
+                      <ChevronDown size={14} className="text-slate-400 hidden sm:block" />
+                    </button>
+
+                    <AnimatePresence>
+                      {profileMenuOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 8 }}
+                          className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl z-50 overflow-hidden"
+                        >
+                          <div className="p-3 border-b border-slate-200 dark:border-slate-700">
+                            <p className="font-medium text-slate-900 dark:text-slate-100 text-sm truncate">{user.full_name}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
+                            {getUserRoles(user).length > 0 && (
+                              <span className="badge bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 mt-1 capitalize">
+                                {getUserRoles(user).map(role => role.replace('_', ' ')).join(', ')}
+                              </span>
+                            )}
+                          </div>
+                          <div className="p-1.5">
+                            <Link
+                              to={
+                                userHasAnyRole(user, ['super_admin']) ? '/superadmin' :
+                                userHasAnyRole(user, ['admin']) ? '/admin' :
+                                userHasAnyRole(user, ['moderator']) ? '/moderator' :
+                                '/dashboard'
+                              }
+                              onClick={() => setProfileMenuOpen(false)}
+                              className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors"
+                            >
+                              <LayoutDashboard size={16} /> My Dashboard
+                            </Link>
+
+                            {!userHasAnyRole(user, ['moderator', 'admin', 'super_admin']) && (
+                              <Link
+                                to="/dashboard/bookmarks"
+                                onClick={() => setProfileMenuOpen(false)}
+                                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors"
+                              >
+                                <Heart size={16} /> Saved Listings
+                              </Link>
+                            )}
+
+                            <button
+                              onClick={toggleTheme}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors"
+                            >
+                              {theme === 'dark' ? (
+                                <><Sun size={16} /> Light Mode</>
+                              ) : (
+                                <><Moon size={16} /> Dark Mode</>
+                              )}
+                            </button>
+
+                            <Link to="/profile" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors">
+                              <Settings size={16} /> Settings
+                            </Link>
+
+                            <hr className="my-1 border-slate-200 dark:border-slate-700" />
+                            <button
+                              onClick={() => { signOut(); setProfileMenuOpen(false); navigate('/'); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                            >
+                              <LogOut size={16} /> Sign Out
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Mobile menu toggle */}
+                  <button
+                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                    className="lg:hidden p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shrink-0"
+                  >
+                    {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+                  </button>
+                </>
+              ) : (
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <Link to="/login" className="btn-secondary text-xs sm:text-sm py-1.5 px-2.5 sm:px-4">Login</Link>
+                  <Link to="/register" className="btn-primary text-xs sm:text-sm py-1.5 px-2.5 sm:px-4">Register</Link>
+                  
                   <Link
                     to="/dashboard/listings/new"
-                    className="btn-accent text-sm py-2 px-3 sm:px-4 flex items-center gap-1.5 shadow-sm hover:shadow transition-all animate-in"
+                    className="btn-accent text-xs sm:text-sm py-1.5 px-2.5 sm:px-4 flex items-center gap-1 shadow-sm hover:shadow transition-all shrink-0"
                   >
                     <Plus size={16} />
-                    <span className="hidden sm:inline">Sell</span>
+                    <span className="hidden sm:inline font-semibold">Sell</span>
                   </Link>
-                )}
-
-                {/* Mobile menu */}
-                <button
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="lg:hidden p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
-                >
-                  {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                </button>
-              </>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Link to="/login" className="btn-secondary text-sm py-2 px-4">Login</Link>
-                <Link to="/register" className="btn-primary text-sm py-2 px-4">Register</Link>
-                
-                {/* Sell button */}
-                <Link
-                  to="/dashboard/listings/new"
-                  className="btn-accent text-sm py-2 px-3 sm:px-4 flex items-center gap-1.5 shadow-sm hover:shadow transition-all animate-in"
-                >
-                  <Plus size={16} />
-                  <span className="hidden sm:inline">Sell</span>
-                </Link>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Profile menu - Positioned in top right corner */}
-          {user && (
-            <div className="absolute top-4 right-4 flex items-center gap-2">
-              {/* Notifications */}
-              <button
-                onClick={() => setNotifModalOpen(true)}
-                className="relative p-2 rounded-xl text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
-              >
-                <Bell size={18} />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium leading-none">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={() => { setProfileMenuOpen(!profileMenuOpen); }}
-                className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-200 dark:border-slate-700"
-              >
-                <Avatar src={user.avatar_url} name={user.full_name} size="sm" />
-                <ChevronDown size={14} className="text-slate-400 hidden sm:block" />
-              </button>
-              <AnimatePresence>
-                {profileMenuOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl z-50 overflow-hidden"
-                  >
-                    <div className="p-3 border-b border-slate-200 dark:border-slate-700">
-                      <p className="font-medium text-slate-900 dark:text-slate-100 text-sm">{user.full_name}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
-                      {getUserRoles(user).length > 0 && (
-                        <span className="badge bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 mt-1 capitalize">
-                          {getUserRoles(user).map(role => role.replace('_', ' ')).join(', ')}
-                        </span>
-                      )}
-                    </div>
-                    <div className="p-1.5">
-                      <Link
-                        to={
-                          userHasAnyRole(user, ['super_admin']) ? '/superadmin' :
-                          userHasAnyRole(user, ['admin']) ? '/admin' :
-                          userHasAnyRole(user, ['moderator']) ? '/moderator' :
-                          '/dashboard'
-                        }
-                        onClick={() => setProfileMenuOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors"
-                      >
-                        <LayoutDashboard size={16} /> My Dashboard
-                      </Link>
-
-                      {/* Saved Listings link */}
-                      {!userHasAnyRole(user, ['moderator', 'admin', 'super_admin']) && (
-                        <Link
-                          to="/dashboard/bookmarks"
-                          onClick={() => setProfileMenuOpen(false)}
-                          className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors"
-                        >
-                          <Heart size={16} /> Saved Listings
-                        </Link>
-                      )}
-
-                      {/* Theme toggle option */}
-                      <button
-                        onClick={toggleTheme}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors"
-                      >
-                        {theme === 'dark' ? (
-                          <><Sun size={16} /> Light Mode</>
-                        ) : (
-                          <><Moon size={16} /> Dark Mode</>
-                        )}
-                      </button>
-
-                      <Link to="/profile" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors">
-                        <Settings size={16} /> Settings
-                      </Link>
-
-                      <hr className="my-1 border-slate-200 dark:border-slate-700" />
-                      <button
-                        onClick={() => { signOut(); setProfileMenuOpen(false); navigate('/'); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
-                      >
-                        <LogOut size={16} /> Sign Out
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+          {/* Mobile Search Bar Row (Dedicated 2nd row below main header on mobile) */}
+          {!userHasAnyRole(user, ['moderator', 'admin', 'super_admin']) && (
+            <div className="pb-3 md:hidden">
+              <form onSubmit={handleSearch} className="w-full">
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Search for anything..."
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent focus:bg-white dark:focus:bg-slate-700 transition-all"
+                  />
+                </div>
+              </form>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Mobile menu */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="lg:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden"
-          >
-            <div className="p-4 grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
-              {CATEGORIES.map(cat => (
-                <Link
-                  key={cat.id}
-                  to={`/category/${cat.slug}`}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                >
-                  <Icon name={cat.icon} size={16} style={{ color: cat.color }} />
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{cat.name}</span>
-                </Link>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </header>
-      
+        {/* Mobile categories dropdown */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="lg:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden"
+            >
+              <div className="p-4 grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+                {CATEGORIES.map(cat => (
+                  <Link
+                    key={cat.id}
+                    to={`/category/${cat.slug}`}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <Icon name={cat.icon} size={16} style={{ color: cat.color }} />
+                    <span className="text-sm text-slate-700 dark:text-slate-300">{cat.name}</span>
+                  </Link>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
+
       {/* Notifications Modal */}
       <Modal
         isOpen={notifModalOpen}

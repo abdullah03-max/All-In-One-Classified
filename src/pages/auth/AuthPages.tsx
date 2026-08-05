@@ -686,37 +686,6 @@ export const AdminLoginPage: React.FC = () => {
             </Button>
           </form>
         </div>
-
-        {/* Super Admin credentials */}
-        <div className="mt-4 card p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-700">
-          <p className="text-xs text-slate-600 dark:text-slate-300 font-medium mb-3">Super Admin Access:</p>
-          <button
-            type="button"
-            onClick={() => handleDemoSignIn('classifiedallinon@gmail.com', 'Abdullah0090@', 'Super Admin')}
-            disabled={isSubmitting || isDemoLoading !== null}
-            className="w-full text-left rounded-xl border border-purple-300 dark:border-purple-600 px-4 py-3 transition hover:border-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/40 disabled:opacity-50 disabled:cursor-not-allowed bg-white dark:bg-slate-800"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  Super Admin
-                  {isDemoLoading === 'Super Admin' && (
-                    <span className="w-2 h-2 rounded-full bg-purple-500 animate-ping" />
-                  )}
-                </p>
-                <p className="text-xs text-slate-600 dark:text-slate-400">
-                  <span className="text-purple-600 dark:text-purple-400 font-medium">Email:</span> classifiedallinon@gmail.com
-                </p>
-                <p className="text-xs text-slate-600 dark:text-slate-400">
-                  <span className="text-purple-600 dark:text-purple-400 font-medium">Password:</span> Abdullah0090@
-                </p>
-              </div>
-              <span className="text-purple-600 dark:text-purple-400 text-sm font-semibold hover:underline">
-                {isDemoLoading === 'Super Admin' ? 'Connecting...' : 'Access Dashboard'}
-              </span>
-            </div>
-          </button>
-        </div>
       </motion.div>
     </div>
   );
