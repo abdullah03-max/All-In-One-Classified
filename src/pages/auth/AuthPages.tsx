@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Package, Mail, Lock, User, Phone } from 'lucide-react';
+import { Eye, EyeOff, Package, Mail, Lock, User, Phone, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Input, Button } from '../../components/ui';
 import { userHasAnyRole } from '../../utils/helpers';
@@ -412,21 +412,36 @@ const forgotSchema = z.object({
 
 export const ForgotPasswordPage: React.FC = () => {
   const { resetPassword } = useAuth();
-  const navigate = useNavigate();
+  const [emailSent, setEmailSent] = useState(false);
+  const [sentEmail, setSentEmail] = useState('');
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(forgotSchema),
   });
 
   const onSubmit = async (data: { email: string }) => {
-    const loadingToast = toast.loading('Sending reset email/OTP...');
+    const loadingToast = toast.loading('Sending reset link...');
     try {
       await resetPassword(data.email);
       toast.dismiss(loadingToast);
-      toast.success('Password reset email/OTP sent! Enter the code to continue.');
-      navigate('/verify-otp', { state: { email: data.email, type: 'recovery' } });
-    } catch {
+      setSentEmail(data.email);
+      setEmailSent(true);
+      toast.success('Password reset link sent!');
+    } catch (err: any) {
       toast.dismiss(loadingToast);
-      toast.error('Failed to send reset email');
+      toast.error(err?.message || 'Failed to send reset email');
+    }
+  };
+
+  const handleResend = async () => {
+    if (!sentEmail) return;
+    const loadingToast = toast.loading('Resending reset link...');
+    try {
+      await resetPassword(sentEmail);
+      toast.dismiss(loadingToast);
+      toast.success('Reset link resent successfully!');
+    } catch (err: any) {
+      toast.dismiss(loadingToast);
+      toast.error(err?.message || 'Failed to resend reset link.');
     }
   };
 
@@ -444,29 +459,67 @@ export const ForgotPasswordPage: React.FC = () => {
             </div>
             <span className="text-2xl font-bold text-gradient">All in one</span>
           </Link>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-display">Reset Password</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">We'll send you a verification code</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-display">
+            {emailSent ? "Check Your Email" : "Reset Password"}
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
+            {emailSent
+              ? `We sent a password reset link to ${sentEmail}`
+              : "Enter your registered email to receive a password reset link"}
+          </p>
         </div>
 
         <div className="card p-6 shadow-lg">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <Input
-              label="Email"
-              type="email"
-              placeholder="you@example.com"
-              leftIcon={<Mail size={16} />}
-              error={errors.email?.message}
-              {...register('email')}
-            />
-            <Button type="submit" className="w-full" size="lg" loading={isSubmitting}>
-              Send Reset Link/OTP
-            </Button>
-            <div className="text-center">
-              <Link to="/login" className="text-sm text-slate-500 hover:text-primary-600 transition-colors">
-                Back to sign in
-              </Link>
+          {emailSent ? (
+            <div className="text-center space-y-5">
+              <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-full flex items-center justify-center mx-auto text-emerald-500">
+                <CheckCircle size={32} />
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Please check your inbox (and spam folder) for an email with a link to reset your password. Click the link in the email to set a new password.
+                </p>
+              </div>
+
+              <div className="pt-2 space-y-3">
+                <Link to="/login" className="block w-full">
+                  <Button variant="primary" className="w-full" size="lg">
+                    Back to Sign In
+                  </Button>
+                </Link>
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    className="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 hover:underline cursor-pointer"
+                  >
+                    Didn't receive the email? Click to resend
+                  </button>
+                </div>
+              </div>
             </div>
-          </form>
+          ) : (
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <Input
+                label="Email"
+                type="email"
+                placeholder="you@example.com"
+                leftIcon={<Mail size={16} />}
+                error={errors.email?.message}
+                {...register('email')}
+              />
+              <Button type="submit" className="w-full" size="lg" loading={isSubmitting}>
+                Send Reset Link
+              </Button>
+              <div className="text-center">
+                <Link to="/login" className="text-sm text-slate-500 hover:text-primary-600 transition-colors">
+                  Back to sign in
+                </Link>
+              </div>
+            </form>
+          )}
         </div>
       </motion.div>
     </div>
