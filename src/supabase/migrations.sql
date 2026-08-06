@@ -1642,4 +1642,22 @@ CREATE POLICY "Admins/Moderators/Super Admins can update applications"
     )
   );
 
+-- RPC function to check if email already exists in auth.users or public.users before registration
+CREATE OR REPLACE FUNCTION public.check_email_exists(user_email text)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM auth.users WHERE LOWER(email) = LOWER(user_email)
+  ) OR EXISTS (
+    SELECT 1 FROM public.users WHERE LOWER(email) = LOWER(user_email)
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.check_email_exists(text) TO anon, authenticated, service_role;
+
+
 

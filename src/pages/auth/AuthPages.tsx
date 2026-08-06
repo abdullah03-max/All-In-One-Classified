@@ -276,12 +276,8 @@ export const RegisterPage: React.FC = () => {
     } catch (err: unknown) {
       const error = err as { message?: string };
       const message = error.message || 'Failed to create account';
-      if (message.includes('already exists')) {
-        toast.error(
-          data.role === 'seller'
-            ? 'This email already has a buyer account. Please sign in and upgrade to seller from your profile.'
-            : 'An account with this email already exists. Please sign in instead.'
-        );
+      if (/already registered|already exists|duplicate/i.test(message)) {
+        toast.error('This email is already registered. Please sign in instead.');
       } else {
         toast.error(message);
       }

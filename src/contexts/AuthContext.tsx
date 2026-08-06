@@ -228,13 +228,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUp = async (email: string, password: string, fullName: string, role = 'buyer', phone?: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+
+    // 1. Check if email already exists in public.users profile database
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('email', cleanEmail)
+      .maybeSingle();
+
+    if (existingUser) {
+      throw new Error('This email is already registered. Please sign in instead.');
+    }
+
+    // 2. Check check_email_exists RPC function (checks auth.users and public.users)
+    try {
+      const { data: rpcExists } = await supabase.rpc('check_email_exists', { user_email: cleanEmail });
+      if (rpcExists) {
+        throw new Error('This email is already registered. Please sign in instead.');
+      }
+    } catch (rpcErr: any) {
+      if (rpcErr?.message?.includes('already registered')) {
+        throw rpcErr;
+      }
+    }
+
     const roles = buildRolesForRole(role);
     const primaryRole = normalizeUserRoles({ role: role as UserRole, roles }).role;
 
-    // Store all profile data in user_metadata.
+    // 3. Store all profile data in user_metadata.
     // The actual public.users profile is created ONLY after email verification in VerifyOtpPage.
-    const { error } = await supabase.auth.signUp({
-      email,
+    const { data: authData, error } = await supabase.auth.signUp({
+      email: cleanEmail,
       password,
       options: {
         data: {
@@ -248,9 +273,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (error) {
       if (error.status === 422 || /already exists|already registered|duplicate key/i.test(error.message || '')) {
-        throw new Error('An account with this email already exists. Please sign in and upgrade your account to seller from your profile.');
+        throw new Error('This email is already registered. Please sign in instead.');
       }
       throw error;
+    }
+
+    // 4. Supabase GoTrue returns user.identities: [] when the email is already registered in auth.users
+    if (authData?.user && authData.user.identities && authData.user.identities.length === 0) {
+      throw new Error('This email is already registered. Please sign in instead.');
     }
 
     // DO NOT upsert profile here — profile is created in VerifyOtpPage after email verification
