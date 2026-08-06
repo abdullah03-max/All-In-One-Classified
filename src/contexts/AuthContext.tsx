@@ -71,6 +71,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
+    // Always reactivate user profile by email to handle re-registration after deletion
+    if (authUser.email) {
+      await supabase
+        .from('users')
+        .update({
+          is_active: true,
+          full_name: userName,
+          updated_at: new Date().toISOString()
+        })
+        .eq('email', authUser.email);
+    }
+
     // 1. Check if user profile already exists to prevent 409 Conflict
     const { data: existingProfile } = await supabase
       .from('users')
