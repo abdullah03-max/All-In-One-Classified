@@ -12,7 +12,7 @@ import { CATEGORIES } from '../../utils/constants';
 import Icon from '../ui/Icon';
 import { notificationsService } from '../../services';
 import { Notification } from '../../types';
-import { formatDate, getUserRoles, userHasAnyRole, cn } from '../../utils/helpers';
+import { formatDate, getUserRoles, userHasAnyRole, cn, playNotificationSound } from '../../utils/helpers';
 import { useUnreadMessages } from '../../contexts/UnreadMessagesContext';
 
 const Header: React.FC = () => {
@@ -42,6 +42,7 @@ const Header: React.FC = () => {
         if (payload.eventType === 'INSERT') {
           setNotifications(prev => [payload.new as Notification, ...prev]);
           setUnreadCount(prev => prev + 1);
+          playNotificationSound();
         } else if (payload.eventType === 'UPDATE') {
           const updated = payload.new as Notification;
           setNotifications(prev => prev.map(n => n.id === updated.id ? updated : n));

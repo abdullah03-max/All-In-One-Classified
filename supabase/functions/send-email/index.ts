@@ -32,19 +32,23 @@ serve(async (req) => {
       }
     });
 
-    // Create plain text fallback if not provided
+    // Clean plain text fallback
     const plainText = text || html.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+    // Clean subject without emojis (emojis in subject cause Gmail spam score penalty)
+    const cleanSubject = (subject || '').replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
 
     await transporter.sendMail({
       from: '"All in One Marketplace" <classifiedallinon@gmail.com>',
       replyTo: '"All in One Marketplace" <classifiedallinon@gmail.com>',
       to,
-      subject,
+      subject: cleanSubject || subject,
       text: plainText,
       html,
       headers: {
-        'X-Mailer': 'AllInOneMarketplace/1.0',
-        'X-Priority': '3',
+        'X-Mailer': 'AllInOneMarketplace Notification System',
+        'X-Entity-Ref-ID': `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        'List-Unsubscribe': '<mailto:classifiedallinon@gmail.com?subject=unsubscribe>',
+        'Precedence': 'bulk'
       }
     });
 

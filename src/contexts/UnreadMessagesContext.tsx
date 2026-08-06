@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
+import { playNotificationSound } from '../utils/helpers';
 
 interface UnreadMessagesContextType {
   totalUnread: number;
@@ -67,8 +68,9 @@ export const UnreadMessagesProvider: React.FC<{ children: React.ReactNode }> = (
         },
         (payload) => {
           if (payload.new.sender_id !== user.id) {
-            // Message from someone else → bump badge
+            // Message from someone else → bump badge & ring chime
             setTotalUnread(prev => prev + 1);
+            playNotificationSound();
           }
         }
       )
