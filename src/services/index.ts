@@ -344,76 +344,27 @@ export const usersService = {
     const userName = params.name || 'Valued Member';
 
     const emailBody = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 40px 16px; color: #1e293b; max-width: 600px; margin: 0 auto; border-radius: 12px; border: 1px solid #e2e8f0;">
-        <!-- Header & Logo -->
-        <div style="text-align: center; margin-bottom: 24px;">
-          <h2 style="font-size: 24px; font-weight: 800; color: #2563eb; margin: 0; letter-spacing: -0.5px;">All in One Marketplace</h2>
-          <div style="height: 3px; width: 50px; background-color: #2563eb; margin: 8px auto 0 auto; border-radius: 2px;"></div>
+      <div style="font-family: Arial, Helvetica, sans-serif; background-color: #ffffff; padding: 24px; color: #0f172a; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <h2 style="font-size: 20px; font-weight: 700; color: #2563eb; margin: 0 0 16px 0;">All in One Marketplace</h2>
+        <p style="font-size: 15px; line-height: 1.5; margin: 0 0 12px 0;">Hello <strong>${userName}</strong>,</p>
+        <p style="font-size: 15px; line-height: 1.5; margin: 0 0 20px 0;">Your account registration is complete and verified. You may now access your dashboard and manage your account.</p>
+        <div style="margin: 24px 0;">
+          <a href="${getStartedUrl}" style="background-color: #2563eb; color: #ffffff; padding: 10px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;">Access Your Account</a>
         </div>
-
-        <!-- Main Content Card -->
-        <div style="background-color: #ffffff; padding: 32px; border-radius: 8px; border: 1px solid #e2e8f0;">
-          <h1 style="color: #0f172a; font-size: 20px; font-weight: 700; margin: 0 0 16px 0;">Welcome to All in One Marketplace</h1>
-
-          <p style="font-size: 15px; line-height: 1.5; color: #334155; margin-bottom: 16px;">
-            Hello <strong>${userName}</strong>,
-          </p>
-
-          <p style="font-size: 15px; line-height: 1.5; color: #334155; margin-bottom: 24px;">
-            Thank you for registering your account with All in One Marketplace. Your registration was successful and your account is now ready for use.
-          </p>
-
-          <!-- Feature Highlights Box -->
-          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin-bottom: 24px;">
-            <p style="margin: 0 0 12px 0; font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Features included with your account:</p>
-            
-            <div style="margin-bottom: 12px;">
-              <p style="margin: 0; font-size: 14px; font-weight: 600; color: #0f172a;">Discover Listings</p>
-              <p style="margin: 2px 0 0 0; font-size: 13px; color: #64748b;">Browse verified listings across vehicles, electronics, property, and services.</p>
-            </div>
-
-            <div style="margin-bottom: 12px;">
-              <p style="margin: 0; font-size: 14px; font-weight: 600; color: #0f172a;">Post Advertisements</p>
-              <p style="margin: 2px 0 0 0; font-size: 13px; color: #64748b;">List your items easily and connect directly with buyers.</p>
-            </div>
-
-            <div>
-              <p style="margin: 0; font-size: 14px; font-weight: 600; color: #0f172a;">Direct Messaging</p>
-              <p style="margin: 2px 0 0 0; font-size: 13px; color: #64748b;">Communicate securely with other members in real time.</p>
-            </div>
-          </div>
-
-          <!-- Get Started CTA Button -->
-          <div style="text-align: center; margin: 28px 0;">
-            <a href="${getStartedUrl}" style="display: inline-block; padding: 12px 30px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">Visit All in One Marketplace</a>
-          </div>
-
-          <!-- Help & Support Links -->
-          <div style="border-top: 1px solid #e2e8f0; padding-top: 16px; text-align: center;">
-            <p style="margin: 0; font-size: 13px; color: #64748b;">
-              For support or assistance, please visit 
-              <a href="${supportUrl}" style="color: #2563eb; text-decoration: underline;">Help & Support</a> 
-              or 
-              <a href="${supportUrl}" style="color: #2563eb; text-decoration: underline;">Contact Us</a>.
-            </p>
-          </div>
-        </div>
-
-        <!-- Footer -->
-        <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #94a3b8;">
-          <p style="margin: 0 0 4px 0;">All in One Marketplace Team</p>
-          <p style="margin: 0;">This is an automated notification regarding your account registration.</p>
+        <div style="border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 24px; font-size: 13px; color: #64748b;">
+          <p style="margin: 0 0 8px 0;">For assistance, visit <a href="${supportUrl}" style="color: #2563eb; text-decoration: underline;">Help & Support</a> or <a href="${supportUrl}" style="color: #2563eb; text-decoration: underline;">Contact Us</a>.</p>
+          <p style="margin: 0; font-size: 12px; color: #94a3b8;">All in One Marketplace &copy; 2026. Account notification.</p>
         </div>
       </div>
     `;
 
-    const plainText = `Hello ${userName},\n\nThank you for registering your account with All in One Marketplace. Your registration was successful and your account is now ready for use.\n\nVisit All in One Marketplace: ${getStartedUrl}\n\nHelp & Support: ${supportUrl}`;
+    const plainText = `Hello ${userName},\n\nYour account registration is complete and verified. You may now access your dashboard: ${getStartedUrl}\n\nHelp & Support: ${supportUrl}`;
 
     try {
       const { data: resData, error: resError } = await supabase.functions.invoke('send-email', {
         body: {
           to: params.email,
-          subject: `Welcome to All in One Marketplace, ${userName}`,
+          subject: `Account Registration Complete for ${userName}`,
           text: plainText,
           html: emailBody
         }
