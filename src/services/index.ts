@@ -366,32 +366,33 @@ export const usersService = {
   async sendWelcomeEmail(params: { email: string; name: string }) {
     if (!params.email) return;
 
-    const getStartedUrl = window.location.origin;
-    const supportUrl = `${window.location.origin}/contact`;
+    const appOrigin = typeof window !== 'undefined' && window.location.origin.includes('localhost')
+      ? 'https://all-in-one-classified.vercel.app'
+      : (typeof window !== 'undefined' ? window.location.origin : 'https://all-in-one-classified.vercel.app');
+
+    const getStartedUrl = appOrigin;
+    const supportUrl = `${appOrigin}/contact`;
     const userName = params.name || 'Valued Member';
 
     const emailBody = `
-      <div style="font-family: Arial, Helvetica, sans-serif; background-color: #ffffff; padding: 24px; color: #0f172a; max-width: 520px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px;">
-        <h2 style="font-size: 20px; font-weight: 700; color: #2563eb; margin: 0 0 16px 0;">All in One Marketplace</h2>
-        <p style="font-size: 15px; line-height: 1.5; margin: 0 0 12px 0;">Hello <strong>${userName}</strong>,</p>
-        <p style="font-size: 15px; line-height: 1.5; margin: 0 0 20px 0;">Your account registration is complete and verified. You may now access your dashboard and manage your account.</p>
-        <div style="margin: 24px 0;">
-          <a href="${getStartedUrl}" style="background-color: #2563eb; color: #ffffff; padding: 10px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;">Access Your Account</a>
+      <div style="font-family: Arial, Helvetica, sans-serif; background-color: #ffffff; padding: 24px; color: #111827; max-width: 500px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px;">
+        <h2 style="font-size: 18px; font-weight: 700; color: #1d4ed8; margin: 0 0 16px 0;">All in One Marketplace</h2>
+        <p style="font-size: 14px; line-height: 1.5; margin: 0 0 12px 0;">Hello ${userName},</p>
+        <p style="font-size: 14px; line-height: 1.5; margin: 0 0 20px 0;">Your account registration is verified and complete. You can access your account below:</p>
+        <div style="margin: 20px 0;">
+          <a href="${getStartedUrl}" style="background-color: #1d4ed8; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;">Access Account</a>
         </div>
-        <div style="border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 24px; font-size: 13px; color: #64748b;">
-          <p style="margin: 0 0 8px 0;">For assistance, visit <a href="${supportUrl}" style="color: #2563eb; text-decoration: underline;">Help & Support</a> or <a href="${supportUrl}" style="color: #2563eb; text-decoration: underline;">Contact Us</a>.</p>
-          <p style="margin: 0; font-size: 12px; color: #94a3b8;">All in One Marketplace &copy; 2026. Account notification.</p>
-        </div>
+        <p style="font-size: 12px; color: #6b7280; margin-top: 24px; border-top: 1px solid #f3f4f6; padding-top: 12px;">If you need assistance, contact support: ${supportUrl}</p>
       </div>
     `;
 
-    const plainText = `Hello ${userName},\n\nYour account registration is complete and verified. You may now access your dashboard: ${getStartedUrl}\n\nHelp & Support: ${supportUrl}`;
+    const plainText = `Hello ${userName},\n\nYour account registration is verified and complete. Access your account: ${getStartedUrl}\nSupport: ${supportUrl}`;
 
     try {
       const { data: resData, error: resError } = await supabase.functions.invoke('send-email', {
         body: {
           to: params.email,
-          subject: `Account Registration Complete for ${userName}`,
+          subject: `Security Notice: Account Registration Verified for ${userName}`,
           text: plainText,
           html: emailBody
         }
