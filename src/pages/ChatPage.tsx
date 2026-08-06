@@ -14,37 +14,57 @@ import toast from 'react-hot-toast';
 const ChatPage: React.FC = () => {
   const { user } = useAuth();
   const { markConversationRead } = useUnreadMessages();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const selectedIdRef = useRef<string | null>(null);
+  const isInitialLoadRef = useRef(true);
 
-  // Keep ref in sync for realtime callbacks
+  // Keep ref in sync for realtime callbacks and persist selection
   useEffect(() => {
     selectedIdRef.current = selected?.id ?? null;
+    if (selected?.id) {
+      try {
+        localStorage.setItem('active_chat_conv_id', selected.id);
+      } catch {}
+    }
   }, [selected]);
 
-  const loadConversations = useCallback(async (preserveSelection = true) => {
+  const loadConversations = useCallback(async () => {
     if (!user) return;
     try {
       const data = await chatService.getConversations(user.id);
-      setConversations(data);
+      
+      // Sort conversations by the actual most recent last_message timestamp (WhatsApp style)
+      const sorted = [...data].sort((a, b) => {
+        const timeA = a.last_message ? new Date(a.last_message.created_at).getTime() : new Date(a.updated_at || a.created_at).getTime();
+        const timeB = b.last_message ? new Date(b.last_message.created_at).getTime() : new Date(b.updated_at || b.created_at).getTime();
+        return timeB - timeA;
+      });
+
+      setConversations(sorted);
 
       const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
-      if (!preserveSelection) {
-        const convId = searchParams.get('conv');
-        if (convId) {
-          const found = data.find(c => c.id === convId);
-          if (found) setSelected(found);
-        } else if (!isMobile && data.length > 0) {
-          setSelected(data[0]);
+      if (isInitialLoadRef.current) {
+        isInitialLoadRef.current = false;
+        const savedConvId = searchParams.get('conv') || (typeof window !== 'undefined' ? localStorage.getItem('active_chat_conv_id') : null);
+        if (savedConvId) {
+          const found = sorted.find(c => c.id === savedConvId);
+          if (found) {
+            setSelected(found);
+            return;
+          }
+        }
+        if (!isMobile && sorted.length > 0) {
+          setSelected(sorted[0]);
         }
       } else {
+        // Subsequent re-fetches (e.g. real-time messages, tab switches)
         if (selectedIdRef.current) {
-          const refreshed = data.find(c => c.id === selectedIdRef.current);
+          const refreshed = sorted.find(c => c.id === selectedIdRef.current);
           if (refreshed) {
             setSelected(prev => prev ? { ...prev, ...refreshed } : refreshed);
           }
@@ -59,17 +79,18 @@ const ChatPage: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    loadConversations(false);
+    loadConversations();
 
     const channel = chatService.subscribeToConversations(user.id, () => {
-      loadConversations(true);
+      loadConversations();
     });
 
     return () => { channel.unsubscribe(); };
-  }, [user, loadConversations]);
+  }, [user]);
 
   const handleSelectConversation = (conv: Conversation) => {
     setSelected(conv);
+    setSearchParams({ conv: conv.id }, { replace: true });
     // Clear unread locally immediately
     setConversations(prev =>
       prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c)

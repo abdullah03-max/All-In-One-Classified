@@ -16,12 +16,18 @@ export const chatService = {
       .order('updated_at', { ascending: false });
     if (error) throw error;
 
-    return (data as unknown as (Conversation & { messages: Message[] })[]).map(conv => ({
+    const list = (data as unknown as (Conversation & { messages: Message[] })[]).map(conv => ({
       ...conv,
       last_message: conv.messages?.sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0],
       unread_count: conv.messages?.filter(m => !m.is_read && m.sender_id !== userId).length || 0,
     }));
+
+    return list.sort((a, b) => {
+      const timeA = a.last_message ? new Date(a.last_message.created_at).getTime() : new Date(a.updated_at || a.created_at).getTime();
+      const timeB = b.last_message ? new Date(b.last_message.created_at).getTime() : new Date(b.updated_at || b.created_at).getTime();
+      return timeB - timeA;
+    });
   },
 
   async getMessages(conversationId: string): Promise<Message[]> {
