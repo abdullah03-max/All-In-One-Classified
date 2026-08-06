@@ -344,76 +344,70 @@ export const usersService = {
     const userName = params.name || 'Valued Member';
 
     const emailBody = `
-      <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 40px 16px; color: #1e293b; max-width: 600px; margin: 0 auto; border-radius: 16px; border: 1px solid #e2e8f0;">
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 40px 16px; color: #1e293b; max-width: 600px; margin: 0 auto; border-radius: 12px; border: 1px solid #e2e8f0;">
         <!-- Header & Logo -->
-        <div style="text-align: center; margin-bottom: 30px;">
-          <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-            <span style="font-size: 26px; font-weight: 800; color: #2563eb; letter-spacing: -0.5px;">All in one</span>
-            <span style="font-size: 26px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px;">Marketplace</span>
-          </div>
-          <div style="height: 4px; width: 60px; background: linear-gradient(90deg, #2563eb, #8b5cf6); margin: 0 auto; border-radius: 2px;"></div>
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h2 style="font-size: 24px; font-weight: 800; color: #2563eb; margin: 0; letter-spacing: -0.5px;">All in One Marketplace</h2>
+          <div style="height: 3px; width: 50px; background-color: #2563eb; margin: 8px auto 0 auto; border-radius: 2px;"></div>
         </div>
 
         <!-- Main Content Card -->
-        <div style="background-color: #ffffff; padding: 32px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); border: 1px solid #f1f5f9;">
-          <div style="text-align: center; margin-bottom: 24px;">
-            <span style="font-size: 40px; display: inline-block; margin-bottom: 12px;">🎉</span>
-            <h1 style="color: #0f172a; font-size: 22px; font-weight: 800; margin: 0; letter-spacing: -0.3px;">Welcome to All in One Marketplace!</h1>
-          </div>
+        <div style="background-color: #ffffff; padding: 32px; border-radius: 8px; border: 1px solid #e2e8f0;">
+          <h1 style="color: #0f172a; font-size: 20px; font-weight: 700; margin: 0 0 16px 0;">Welcome to All in One Marketplace</h1>
 
-          <p style="font-size: 15px; line-height: 1.6; color: #475569; margin-bottom: 16px;">
-            Hi <strong>${userName}</strong>,
+          <p style="font-size: 15px; line-height: 1.5; color: #334155; margin-bottom: 16px;">
+            Hello <strong>${userName}</strong>,
           </p>
 
-          <p style="font-size: 15px; line-height: 1.6; color: #475569; margin-bottom: 24px;">
-            Thank you for joining <strong>All in One Marketplace</strong>! We are thrilled to have you as part of our growing community of buyers and sellers.
+          <p style="font-size: 15px; line-height: 1.5; color: #334155; margin-bottom: 24px;">
+            Thank you for registering your account with All in One Marketplace. Your registration was successful and your account is now ready for use.
           </p>
 
           <!-- Feature Highlights Box -->
-          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 28px;">
-            <p style="margin: 0 0 14px 0; font-size: 13px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Here is what you can do right away:</p>
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin-bottom: 24px;">
+            <p style="margin: 0 0 12px 0; font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Features included with your account:</p>
             
-            <div style="margin-bottom: 14px;">
-              <p style="margin: 0; font-size: 14px; font-weight: 600; color: #0f172a;">🛍️ Discover & Shop</p>
-              <p style="margin: 2px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.4;">Explore thousands of verified listings across vehicles, electronics, fashion, and real estate.</p>
+            <div style="margin-bottom: 12px;">
+              <p style="margin: 0; font-size: 14px; font-weight: 600; color: #0f172a;">Discover Listings</p>
+              <p style="margin: 2px 0 0 0; font-size: 13px; color: #64748b;">Browse verified listings across vehicles, electronics, property, and services.</p>
             </div>
 
-            <div style="margin-bottom: 14px;">
-              <p style="margin: 0; font-size: 14px; font-weight: 600; color: #0f172a;">⚡ Post Ads & Sell Fast</p>
-              <p style="margin: 2px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.4;">List your products in seconds and reach thousands of buyers instantly.</p>
+            <div style="margin-bottom: 12px;">
+              <p style="margin: 0; font-size: 14px; font-weight: 600; color: #0f172a;">Post Advertisements</p>
+              <p style="margin: 2px 0 0 0; font-size: 13px; color: #64748b;">List your items easily and connect directly with buyers.</p>
             </div>
 
             <div>
-              <p style="margin: 0; font-size: 14px; font-weight: 600; color: #0f172a;">💬 Instant Real-time Chat</p>
-              <p style="margin: 2px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.4;">Chat directly with buyers and sellers with full privacy and real-time messaging.</p>
+              <p style="margin: 0; font-size: 14px; font-weight: 600; color: #0f172a;">Direct Messaging</p>
+              <p style="margin: 2px 0 0 0; font-size: 13px; color: #64748b;">Communicate securely with other members in real time.</p>
             </div>
           </div>
 
           <!-- Get Started CTA Button -->
-          <div style="text-align: center; margin: 32px 0;">
-            <a href="${getStartedUrl}" style="display: inline-block; padding: 14px 36px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);">Get Started Now &rarr;</a>
+          <div style="text-align: center; margin: 28px 0;">
+            <a href="${getStartedUrl}" style="display: inline-block; padding: 12px 30px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">Visit All in One Marketplace</a>
           </div>
 
           <!-- Help & Support Links -->
-          <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; text-align: center;">
+          <div style="border-top: 1px solid #e2e8f0; padding-top: 16px; text-align: center;">
             <p style="margin: 0; font-size: 13px; color: #64748b;">
-              Need help getting started? Visit 
-              <a href="${supportUrl}" style="color: #2563eb; text-decoration: underline; font-weight: 600;">Help & Support</a> 
+              For support or assistance, please visit 
+              <a href="${supportUrl}" style="color: #2563eb; text-decoration: underline;">Help & Support</a> 
               or 
-              <a href="${supportUrl}" style="color: #2563eb; text-decoration: underline; font-weight: 600;">Contact Us</a>.
+              <a href="${supportUrl}" style="color: #2563eb; text-decoration: underline;">Contact Us</a>.
             </p>
           </div>
         </div>
 
         <!-- Footer -->
-        <div style="text-align: center; margin-top: 24px; font-size: 12px; color: #94a3b8;">
-          <p style="margin: 0 0 4px 0; font-weight: 600;">All in One Marketplace</p>
-          <p style="margin: 0;">© 2026 All in one Marketplace. All rights reserved.</p>
+        <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #94a3b8;">
+          <p style="margin: 0 0 4px 0;">All in One Marketplace Team</p>
+          <p style="margin: 0;">This is an automated notification regarding your account registration.</p>
         </div>
       </div>
     `;
 
-    const plainText = `Welcome to All in One Marketplace, ${userName}!\n\nThank you for joining our platform!\n\nGet started by exploring listings: ${getStartedUrl}\n\nHelp & Support: ${supportUrl}`;
+    const plainText = `Hello ${userName},\n\nThank you for registering your account with All in One Marketplace. Your registration was successful and your account is now ready for use.\n\nVisit All in One Marketplace: ${getStartedUrl}\n\nHelp & Support: ${supportUrl}`;
 
     try {
       const { data: resData, error: resError } = await supabase.functions.invoke('send-email', {
