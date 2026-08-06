@@ -11,8 +11,11 @@ import { useUnreadMessages } from '../contexts/UnreadMessagesContext';
 import { formatDate, cn, truncate } from '../utils/helpers';
 import toast from 'react-hot-toast';
 
+import { usePresence } from '../contexts/PresenceContext';
+
 const ChatPage: React.FC = () => {
   const { user } = useAuth();
+  const { isUserOnline } = usePresence();
   const { markConversationRead } = useUnreadMessages();
   const [searchParams, setSearchParams] = useSearchParams();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -186,7 +189,10 @@ const ChatPage: React.FC = () => {
                         ) : (
                           <Avatar src={other?.avatar_url} name={other?.full_name || ''} size="md" />
                         )}
-                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" title="Online" />
+                        <span className={cn(
+                          "absolute bottom-0 right-0 w-3 h-3 border-2 border-white dark:border-slate-900 rounded-full transition-colors",
+                          isUserOnline(other?.id, other?.role) ? "bg-emerald-500" : "bg-slate-400"
+                        )} title={isUserOnline(other?.id, other?.role) ? "Online" : "Offline"} />
                         {hasUnread && (
                           <motion.span
                             key={conv.unread_count}

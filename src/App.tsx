@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 import { UnreadMessagesProvider } from './contexts/UnreadMessagesContext';
+import { PresenceProvider } from './contexts/PresenceContext';
 
 // Layout
 import MainLayout from './components/layout/MainLayout';
@@ -126,7 +127,8 @@ const App: React.FC = () => {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
-          <UnreadMessagesProvider>
+          <PresenceProvider>
+            <UnreadMessagesProvider>
           <BrowserRouter>
             <ScrollToTop />
             <Toaster
@@ -385,6 +387,7 @@ const App: React.FC = () => {
             </Routes>
           </BrowserRouter>
           </UnreadMessagesProvider>
+          </PresenceProvider>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>

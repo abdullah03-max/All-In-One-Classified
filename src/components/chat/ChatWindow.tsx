@@ -11,6 +11,8 @@ import toast from 'react-hot-toast';
 import { AudioPlayer } from './AudioPlayer';
 import { supabase } from '../../lib/supabase';
 
+import { usePresence } from '../../contexts/PresenceContext';
+
 interface ChatWindowProps {
   conversation: Conversation;
   onMessageSent?: () => void;
@@ -19,6 +21,7 @@ interface ChatWindowProps {
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, onBack }) => {
   const { user } = useAuth();
+  const { isUserOnline } = usePresence();
   const { markConversationRead } = useUnreadMessages();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -332,7 +335,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
             <Shield size={20} className="animate-pulse" />
           </div>
         ) : (
-          <Avatar src={otherUser?.avatar_url} name={otherUser?.full_name || ''} size="md" />
+          <div className="relative shrink-0">
+            <Avatar src={otherUser?.avatar_url} name={otherUser?.full_name || ''} size="md" />
+            <span className={cn(
+              "absolute bottom-0 right-0 w-3 h-3 border-2 border-white dark:border-slate-800 rounded-full",
+              isUserOnline(otherUser?.id, otherUser?.role) ? "bg-emerald-500" : "bg-slate-400"
+            )} title={isUserOnline(otherUser?.id, otherUser?.role) ? "Online" : "Offline"} />
+          </div>
         )}
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm leading-tight flex items-center gap-1.5">
@@ -349,18 +358,19 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
             </p>
           )}
         </div>
-        {/* Live indicator */}
-        <div className={cn(
-          'flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium transition-colors shrink-0',
-          connected
-            ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
-            : 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400'
-        )}>
-          {connected
-            ? <><Wifi size={11} /><span>Live</span></>
-            : <><WifiOff size={11} /><span>Reconnecting…</span></>
-          }
-        </div>
+
+        {/* Presence indicator */}
+        {isUserOnline(otherUser?.id, otherUser?.role) ? (
+          <div className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Online</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-slate-400" />
+            <span>Offline</span>
+          </div>
+        )}
       </div>
 
       {/* ── Listing preview banner ── (shrink-0) */}
