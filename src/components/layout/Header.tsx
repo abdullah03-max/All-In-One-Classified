@@ -38,7 +38,7 @@ const Header: React.FC = () => {
       };
       fetchNotifs();
 
-      const sub = notificationsService.subscribeToNotifications(user.id, (payload) => {
+      const sub = notificationsService.subscribeToNotifications(user.id, (payload: any) => {
         if (payload.eventType === 'INSERT') {
           setNotifications(prev => [payload.new as Notification, ...prev]);
           setUnreadCount(prev => prev + 1);

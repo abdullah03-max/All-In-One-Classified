@@ -462,13 +462,29 @@ export const AdminUsersPage: React.FC = () => {
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; userId?: string; userName?: string }>({ open: false });
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
+  const fetchUsers = useCallback(() => {
     usersService.getAllUsers().then(d => {
       // Filter to only include buyers and sellers (no moderators, admins, or super admins)
       const regularUsers = (d as unknown as User[]).filter(u => u.role === 'buyer' || u.role === 'seller');
       setUsers(regularUsers);
     }).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchUsers();
+
+    // Supabase Realtime subscription for automatic instant updates in Admin Panel
+    const channel = supabase
+      .channel('admin-users-table-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+        fetchUsers();
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [fetchUsers]);
 
   const filtered = users.filter(u => {
     const matchesSearch = !search || u.full_name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());

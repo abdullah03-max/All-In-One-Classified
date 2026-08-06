@@ -71,37 +71,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    // Always reactivate user profile by email to handle re-registration after deletion
-    if (authUser.email) {
-      await supabase
-        .from('users')
-        .update({
-          is_active: true,
-          full_name: userName,
-          updated_at: new Date().toISOString()
-        })
-        .eq('email', authUser.email);
-    }
-
-    // 1. Check if user profile already exists to prevent 409 Conflict
+    // 1. Check if user profile already exists by ID or Email to re-activate on re-registration
     const { data: existingProfile } = await supabase
       .from('users')
       .select('id')
-      .eq('id', authUser.id)
+      .or(`id.eq.${authUser.id},email.eq.${authUser.email || ''}`)
       .maybeSingle();
 
     if (existingProfile) {
-      // Profile exists -> perform silent update
+      // Profile exists -> re-activate account and update profile details
       await supabase
         .from('users')
         .update({
+          id: authUser.id,
           full_name: userName,
           phone: meta.phone || authUser.phone || null,
           role: primaryRole,
           roles,
           is_active: true,
         })
-        .eq('id', authUser.id);
+        .eq('id', existingProfile.id);
 
       await triggerWelcomeEmail();
       return;

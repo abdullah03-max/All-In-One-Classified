@@ -62,7 +62,7 @@ export const AdminCategoriesPage: React.FC = () => {
       const unsynced = VIRTUAL_CATEGORIES.filter(vc => !dbIds.has(vc.id));
       
       if (unsynced.length === 0) {
-        toast.info('All categories are already synced!');
+        toast.success('All categories are already synced!');
         return;
       }
 

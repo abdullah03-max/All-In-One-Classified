@@ -284,7 +284,7 @@ const ChatPage: React.FC = () => {
           <ChatWindow
             key={selected.id}
             conversation={selected}
-            onMessageSent={() => loadConversations(true)}
+            onMessageSent={() => loadConversations()}
             onBack={() => {
               setSelected(null);
               try {

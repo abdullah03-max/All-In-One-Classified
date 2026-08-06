@@ -609,11 +609,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
                             <span className="text-[10px] text-slate-400">{formatDate(msg.created_at)}</span>
                             {isMine && (
                               (msg.is_read || messages.some(m => m.sender_id !== user?.id && new Date(m.created_at).getTime() >= new Date(msg.created_at).getTime())) ? (
-                                <CheckCheck size={14} className="text-blue-500 font-bold shrink-0" title="Seen" />
+                                <span title="Seen"><CheckCheck size={14} className="text-blue-500 font-bold shrink-0" /></span>
                               ) : (msg.is_delivered || (otherUser && isUserOnline(otherUser.id, otherUser.role))) ? (
-                                <CheckCheck size={14} className="text-slate-400 shrink-0" title="Delivered" />
+                                <span title="Delivered"><CheckCheck size={14} className="text-slate-400 shrink-0" /></span>
                               ) : (
-                                <Check size={14} className="text-slate-400 shrink-0" title="Sent" />
+                                <span title="Sent"><Check size={14} className="text-slate-400 shrink-0" /></span>
                               )
                             )}
                           </div>
