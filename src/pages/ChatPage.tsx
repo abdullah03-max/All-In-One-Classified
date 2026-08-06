@@ -91,7 +91,28 @@ const ChatPage: React.FC = () => {
     return () => { channel.unsubscribe(); };
   }, [user]);
 
+  // Handle browser back button on mobile to return to conversation list
+  useEffect(() => {
+    const handlePopState = () => {
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+      if (isMobile && selectedIdRef.current) {
+        setSelected(null);
+        try {
+          localStorage.removeItem('active_chat_conv_id');
+        } catch {}
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const handleSelectConversation = (conv: Conversation) => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    if (isMobile && !selected) {
+      try {
+        window.history.pushState({ chatOpen: true }, '');
+      } catch {}
+    }
     setSelected(conv);
     setSearchParams({ conv: conv.id }, { replace: true });
     // Clear unread locally immediately
@@ -113,11 +134,11 @@ const ChatPage: React.FC = () => {
   return (
     /**
      * KEY LAYOUT FIX:
-     * Use fixed positioning pinned to viewport edges, UNDER the sticky header (top-16).
-     * This prevents any page-level scroll while the chat is open.
-     * The messages container inside ChatWindow gets its own overflow-y-auto scroll.
+     * Mobile header height is 108px (2 rows with search bar).
+     * Desktop header height is 64px (top-16).
+     * Using top-[108px] md:top-16 ensures ChatWindow header & Back Arrow are never cut off.
      */
-    <div className="fixed inset-0 top-16 bottom-0 flex bg-white dark:bg-slate-900 overflow-hidden">
+    <div className="fixed inset-0 top-[108px] md:top-16 bottom-0 flex bg-white dark:bg-slate-900 overflow-hidden">
       {/* ── Sidebar ── */}
       <div className={cn(
         "w-full md:w-72 shrink-0 border-r border-slate-200 dark:border-slate-700 flex flex-col bg-white dark:bg-slate-900",
@@ -259,7 +280,13 @@ const ChatPage: React.FC = () => {
             key={selected.id}
             conversation={selected}
             onMessageSent={() => loadConversations(true)}
-            onBack={() => setSelected(null)}
+            onBack={() => {
+              setSelected(null);
+              try {
+                localStorage.removeItem('active_chat_conv_id');
+              } catch {}
+              setSearchParams({}, { replace: true });
+            }}
           />
         ) : (
           <EmptyState

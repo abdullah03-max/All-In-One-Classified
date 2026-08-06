@@ -323,11 +323,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
       <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
         {onBack && (
           <button
+            type="button"
             onClick={onBack}
-            className="md:hidden p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors shrink-0 cursor-pointer"
-            title="Back to list"
+            className="md:hidden p-2 -ml-1 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/80 rounded-full transition-colors shrink-0 cursor-pointer flex items-center justify-center"
+            title="Back to conversation list"
+            aria-label="Back to conversation list"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={22} className="text-slate-800 dark:text-slate-100 font-bold" />
           </button>
         )}
         {otherUser?.role === 'moderator' || otherUser?.role === 'admin' || otherUser?.role === 'super_admin' ? (
