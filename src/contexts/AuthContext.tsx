@@ -47,18 +47,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Creates a public.users profile from auth user metadata (called on first login after email verify)
+  // Creates a public.users profile from auth user metadata (called on first login after email verify or Google OAuth)
   const ensureProfile = useCallback(async (authUser: { id: string; email?: string; user_metadata?: Record<string, any>; phone?: string }) => {
     const meta = authUser.user_metadata || {};
     const role = (meta.role as string) || 'buyer';
     const roles = buildRolesForRole(role);
     const primaryRole = ROLE_PRIORITY.find(r => roles.includes(r as UserRole)) ?? 'buyer';
 
+    const userName = meta.full_name || meta.name || meta.preferred_username || (authUser.email ? authUser.email.split('@')[0] : 'Member');
+
     // 1. Try upserting all columns (roles, email_verified)
     const { error: firstError } = await supabase.from('users').upsert({
       id: authUser.id,
       email: authUser.email || '',
-      full_name: meta.full_name || '',
+      full_name: userName,
       phone: meta.phone || authUser.phone || null,
       role: primaryRole,
       roles,
@@ -69,8 +71,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!firstError) {
       if (authUser.email) {
-        const userName = meta.full_name || authUser.email.split('@')[0];
-        usersService.sendWelcomeEmail({ email: authUser.email, name: userName });
+        try {
+          await usersService.sendWelcomeEmail({ email: authUser.email, name: userName });
+        } catch (emailErr) {
+          console.error('Welcome email dispatch error:', emailErr);
+        }
       }
       return;
     }
@@ -84,7 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fallbackData: Record<string, any> = {
       id: authUser.id,
       email: authUser.email || '',
-      full_name: meta.full_name || '',
+      full_name: userName,
       phone: meta.phone || authUser.phone || null,
       role: primaryRole,
       is_verified: false,
@@ -101,8 +106,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { error: fallbackError } = await supabase.from('users').upsert(fallbackData, { onConflict: 'id' });
     if (!fallbackError) {
       if (authUser.email) {
-        const userName = meta.full_name || authUser.email.split('@')[0];
-        usersService.sendWelcomeEmail({ email: authUser.email, name: userName });
+        try {
+          await usersService.sendWelcomeEmail({ email: authUser.email, name: userName });
+        } catch (emailErr) {
+          console.error('Welcome email dispatch error:', emailErr);
+        }
       }
       return;
     }
@@ -114,7 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error: finalError } = await supabase.from('users').upsert({
         id: authUser.id,
         email: authUser.email || '',
-        full_name: meta.full_name || '',
+        full_name: userName,
         phone: meta.phone || authUser.phone || null,
         role: primaryRole,
         is_verified: false,
@@ -122,8 +130,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }, { onConflict: 'id' });
       
       if (!finalError && authUser.email) {
-        const userName = meta.full_name || authUser.email.split('@')[0];
-        usersService.sendWelcomeEmail({ email: authUser.email, name: userName });
+        try {
+          await usersService.sendWelcomeEmail({ email: authUser.email, name: userName });
+        } catch (emailErr) {
+          console.error('Welcome email dispatch error:', emailErr);
+        }
       }
     }
   }, []);
