@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { supabase } from '../lib/supabase';
 import { User, UserRole } from '../types';
 import toast from 'react-hot-toast';
+import { usersService } from '../services';
 
 const ROLE_PRIORITY: UserRole[] = ['super_admin', 'admin', 'moderator', 'seller', 'buyer'];
 
@@ -66,7 +67,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       is_active: true,
     }, { onConflict: 'id' });
 
-    if (!firstError) return;
+    if (!firstError) {
+      if (authUser.email) {
+        const userName = meta.full_name || authUser.email.split('@')[0];
+        usersService.sendWelcomeEmail({ email: authUser.email, name: userName });
+      }
+      return;
+    }
 
     console.error('First profile upsert failed:', firstError);
 
@@ -92,6 +99,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const { error: fallbackError } = await supabase.from('users').upsert(fallbackData, { onConflict: 'id' });
+    if (!fallbackError) {
+      if (authUser.email) {
+        const userName = meta.full_name || authUser.email.split('@')[0];
+        usersService.sendWelcomeEmail({ email: authUser.email, name: userName });
+      }
+      return;
+    }
+
     if (fallbackError) {
       console.error('Fallback profile upsert failed:', fallbackError);
       
@@ -106,8 +121,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         is_active: true,
       }, { onConflict: 'id' });
       
-      if (finalError) {
-        console.error('Final minimum profile upsert failed:', finalError);
+      if (!finalError && authUser.email) {
+        const userName = meta.full_name || authUser.email.split('@')[0];
+        usersService.sendWelcomeEmail({ email: authUser.email, name: userName });
       }
     }
   }, []);
