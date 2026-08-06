@@ -38,14 +38,15 @@ serve(async (req) => {
     const cleanSubject = (subject || '').replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
 
     await transporter.sendMail({
-      from: 'All in One <classifiedallinon@gmail.com>',
+      from: '"All in One Marketplace" <classifiedallinon@gmail.com>',
       replyTo: 'classifiedallinon@gmail.com',
       to,
       subject: cleanSubject || subject,
       text: plainText,
-      html,
+      html: html || plainText,
       headers: {
-        'X-Mailer': 'Nodemailer',
+        'Message-ID': `<${Date.now()}.${Math.random().toString(36).substring(2, 8)}@gmail.com>`,
+        'X-Entity-Ref-ID': `${Date.now()}`,
         'X-Auto-Response-Suppress': 'OOF, AutoReply',
       }
     });
