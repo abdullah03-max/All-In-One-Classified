@@ -1689,6 +1689,39 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.mark_messages_read(UUID, UUID) TO anon, authenticated, service_role;
 
+-- Columns for 2FA and Notification Preferences
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT false;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS notification_preferences JSONB DEFAULT '{"new_messages": true, "new_offers": true, "listing_status_changes": true, "price_drops": false, "marketing_emails": false}'::jsonb;
+
+-- RPC function to delete account data safely
+CREATE OR REPLACE FUNCTION public.delete_user_account(p_user_id UUID)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  -- Delete bookmarks
+  DELETE FROM public.bookmarks WHERE user_id = p_user_id;
+  -- Delete offers
+  DELETE FROM public.offers WHERE buyer_id = p_user_id OR seller_id = p_user_id;
+  -- Delete notifications
+  DELETE FROM public.notifications WHERE user_id = p_user_id;
+  -- Delete verification applications
+  DELETE FROM public.verification_applications WHERE user_id = p_user_id;
+  -- Delete messages
+  DELETE FROM public.messages WHERE sender_id = p_user_id;
+  -- Delete conversations
+  DELETE FROM public.conversations WHERE buyer_id = p_user_id OR seller_id = p_user_id;
+  -- Delete listings
+  DELETE FROM public.listings WHERE seller_id = p_user_id;
+  -- Delete public.users record
+  DELETE FROM public.users WHERE id = p_user_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.delete_user_account(UUID) TO authenticated, service_role;
+
+
 
 
 

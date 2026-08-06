@@ -174,11 +174,38 @@ export const usersService = {
   },
 
   async uploadAvatar(file: File, userId: string): Promise<string> {
-    const ext = file.name.split('.').pop();
-    const path = `${userId}/avatar.${ext}`;
-    await supabase.storage.from('avatars').upload(path, file, { upsert: true });
-    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
-    return publicUrl;
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `${userId}/avatar_${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+      if (uploadErr) throw uploadErr;
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
+      return publicUrl;
+    } catch {
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+  },
+
+  async deleteUserAccount(userId: string): Promise<void> {
+    try {
+      await supabase.rpc('delete_user_account', { p_user_id: userId });
+    } catch {
+      await Promise.allSettled([
+        supabase.from('bookmarks').delete().eq('user_id', userId),
+        supabase.from('notifications').delete().eq('user_id', userId),
+        supabase.from('offers').delete().or(`buyer_id.eq.${userId},seller_id.eq.${userId}`),
+        supabase.from('verification_applications').delete().eq('user_id', userId),
+        supabase.from('messages').delete().eq('sender_id', userId),
+        supabase.from('conversations').delete().or(`buyer_id.eq.${userId},seller_id.eq.${userId}`),
+        supabase.from('listings').delete().eq('seller_id', userId),
+        supabase.from('users').delete().eq('id', userId),
+      ]);
+    }
   },
 
   async createAdmin(params: { email: string; name: string; phone?: string; password: string }): Promise<string> {

@@ -1,5 +1,13 @@
 export type UserRole = 'buyer' | 'seller' | 'moderator' | 'admin' | 'super_admin';
 
+export interface NotificationPreferences {
+  new_messages: boolean;
+  new_offers: boolean;
+  listing_status_changes: boolean;
+  price_drops: boolean;
+  marketing_emails: boolean;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -17,6 +25,8 @@ export interface User {
   city?: string;
   country?: string;
   bio?: string;
+  two_factor_enabled?: boolean;
+  notification_preferences?: NotificationPreferences;
 }
 
 export type ListingStatus = 'draft' | 'pending' | 'active' | 'rejected' | 'sold' | 'expired' | 'suspended' | 'changes_requested';
