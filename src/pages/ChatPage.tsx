@@ -45,6 +45,11 @@ const ChatPage: React.FC = () => {
         const timeA = a.last_message ? new Date(a.last_message.created_at).getTime() : new Date(a.updated_at || a.created_at).getTime();
         const timeB = b.last_message ? new Date(b.last_message.created_at).getTime() : new Date(b.updated_at || b.created_at).getTime();
         return timeB - timeA;
+      }).map(c => {
+        if (selectedIdRef.current && c.id === selectedIdRef.current) {
+          return { ...c, unread_count: 0 };
+        }
+        return c;
       });
 
       setConversations(sorted);

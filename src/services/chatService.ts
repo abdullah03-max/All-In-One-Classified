@@ -109,19 +109,6 @@ export const chatService = {
         .update({ is_read: true, is_delivered: true })
         .eq('conversation_id', conversationId)
         .neq('sender_id', userId);
-
-      // Broadcast read receipt signal for instant real-time double blue ticks
-      const channel = supabase.channel(`messages:conv:${conversationId}`);
-      channel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          channel.send({
-            type: 'broadcast',
-            event: 'read_receipt',
-            payload: { conversationId, readerId: userId },
-          });
-          setTimeout(() => channel.unsubscribe(), 1000);
-        }
-      });
     } catch {
       await supabase
         .from('messages')

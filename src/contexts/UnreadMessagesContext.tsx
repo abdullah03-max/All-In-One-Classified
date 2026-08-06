@@ -42,11 +42,16 @@ export const UnreadMessagesProvider: React.FC<{ children: React.ReactNode }> = (
     }
   }, [user]);
 
-  const markConversationRead = useCallback((conversationId: string) => {
-    // Optimistically lower the count — exact value will be corrected on next fetch
+  const markConversationRead = useCallback(async (conversationId: string) => {
     if (!user) return;
-    // Re-fetch after a small delay to get the accurate count
-    setTimeout(fetchUnreadCount, 300);
+    try {
+      await supabase
+        .from('messages')
+        .update({ is_read: true, is_delivered: true })
+        .eq('conversation_id', conversationId)
+        .neq('sender_id', user.id);
+    } catch {}
+    fetchUnreadCount();
   }, [user, fetchUnreadCount]);
 
   useEffect(() => {
