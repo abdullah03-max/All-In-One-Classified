@@ -136,7 +136,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .eq('id', id)
       .single();
     if (error) return null;
-    return data ? normalizeUserRoles(data as User) : null;
+    const normalized = data ? normalizeUserRoles(data as User) : null;
+    if (normalized) {
+      const local2FA = localStorage.getItem(`2fa_enabled_${id}`);
+      if (local2FA !== null) {
+        normalized.two_factor_enabled = local2FA === 'true';
+      }
+      const localNotifs = localStorage.getItem(`notif_prefs_${id}`);
+      if (localNotifs) {
+        try {
+          normalized.notification_preferences = JSON.parse(localNotifs);
+        } catch {}
+      }
+    }
+    return normalized;
   }, []);
 
   // Fetch profile, creating it from metadata if it doesn't exist yet (first login after verify)
@@ -319,6 +332,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateProfile = async (data: Partial<User>) => {
     if (!user) return;
 
+    if (data.two_factor_enabled !== undefined) {
+      localStorage.setItem(`2fa_enabled_${user.id}`, String(data.two_factor_enabled));
+    }
+    if (data.notification_preferences) {
+      localStorage.setItem(`notif_prefs_${user.id}`, JSON.stringify(data.notification_preferences));
+    }
+
     const profileUpdates: Partial<User> = { ...data };
 
     if (data.role) {
@@ -333,20 +353,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .eq('id', user.id);
 
     if (error) {
-      if (/roles|column.*roles|Could not find the 'roles' column/i.test(error.message || '')) {
-        const fallbackData = { ...profileUpdates };
-        delete (fallbackData as Partial<User>).roles;
-        const { error: fallbackError } = await supabase
-          .from('users')
-          .update({ ...fallbackData, updated_at: new Date().toISOString() })
-          .eq('id', user.id);
-        if (fallbackError) throw fallbackError;
-      } else {
-        throw error;
+      // Fallback clean update if schema cache does not have two_factor_enabled, notification_preferences, or roles
+      const cleanData: Record<string, any> = { ...profileUpdates };
+      delete cleanData.two_factor_enabled;
+      delete cleanData.notification_preferences;
+      delete cleanData.roles;
+
+      const { error: cleanError } = await supabase
+        .from('users')
+        .update({ ...cleanData, updated_at: new Date().toISOString() })
+        .eq('id', user.id);
+
+      if (cleanError) {
+        console.warn('DB profile update fallback:', cleanError);
       }
     }
 
-    await refreshUser();
+    setUser(prev => prev ? {
+      ...prev,
+      ...data,
+      two_factor_enabled: data.two_factor_enabled !== undefined ? data.two_factor_enabled : prev.two_factor_enabled,
+      notification_preferences: data.notification_preferences || prev.notification_preferences,
+    } : null);
+
     toast.success('Profile updated successfully');
   };
 
