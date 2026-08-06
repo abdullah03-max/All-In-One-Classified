@@ -193,18 +193,17 @@ export const usersService = {
 
   async deleteUserAccount(userId: string): Promise<void> {
     try {
-      await supabase.rpc('delete_user_account', { p_user_id: userId });
-    } catch {
+      // 1. Set user status as deactivated (is_active = false) in public.users table
+      await supabase.from('users').update({ is_active: false, updated_at: new Date().toISOString() }).eq('id', userId);
+      // 2. Suspend all active listings for this user
+      await supabase.from('listings').update({ status: 'suspended' }).eq('seller_id', userId);
+      // 3. Delete user's bookmarks and notifications
       await Promise.allSettled([
         supabase.from('bookmarks').delete().eq('user_id', userId),
         supabase.from('notifications').delete().eq('user_id', userId),
-        supabase.from('offers').delete().or(`buyer_id.eq.${userId},seller_id.eq.${userId}`),
-        supabase.from('verification_applications').delete().eq('user_id', userId),
-        supabase.from('messages').delete().eq('sender_id', userId),
-        supabase.from('conversations').delete().or(`buyer_id.eq.${userId},seller_id.eq.${userId}`),
-        supabase.from('listings').delete().eq('seller_id', userId),
-        supabase.from('users').delete().eq('id', userId),
       ]);
+    } catch (err) {
+      console.error('deleteUserAccount error:', err);
     }
   },
 

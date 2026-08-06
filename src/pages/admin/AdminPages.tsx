@@ -596,7 +596,7 @@ export const AdminUsersPage: React.FC = () => {
                       </td>
 
                       <td className="p-3">
-                        <Badge variant={u.is_active ? 'success' : 'error'}>{u.is_active ? 'Active' : 'Suspended'}</Badge>
+                        <Badge variant={u.is_active ? 'success' : 'error'}>{u.is_active ? 'Active' : 'Deactivated'}</Badge>
                       </td>
                       <td className="p-3 text-slate-500 text-xs">{formatDate(u.created_at)}</td>
                       <td className="p-3">
