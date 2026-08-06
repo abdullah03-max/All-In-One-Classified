@@ -32,12 +32,14 @@ const ChatPage: React.FC = () => {
       const data = await chatService.getConversations(user.id);
       setConversations(data);
 
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
       if (!preserveSelection) {
         const convId = searchParams.get('conv');
         if (convId) {
           const found = data.find(c => c.id === convId);
           if (found) setSelected(found);
-        } else if (data.length > 0) {
+        } else if (!isMobile && data.length > 0) {
           setSelected(data[0]);
         }
       } else {
@@ -136,6 +138,10 @@ const ChatPage: React.FC = () => {
                   return conv.listing.title !== 'All in One System';
                 })();
 
+                const lastMsgText = conv.last_message?.content?.startsWith('[audio]:')
+                  ? '🎤 Voice message'
+                  : conv.last_message?.content;
+
                 return (
                   <motion.button
                     key={conv.id}
@@ -146,25 +152,26 @@ const ChatPage: React.FC = () => {
                     transition={{ duration: 0.15 }}
                     onClick={() => handleSelectConversation(conv)}
                     className={cn(
-                      'w-full text-left p-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-b border-slate-100 dark:border-slate-700/50',
-                      isSelected && 'bg-primary-50 dark:bg-primary-900/20'
+                      'w-full text-left p-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors border-b border-slate-100 dark:border-slate-800/60 cursor-pointer',
+                      isSelected && 'bg-primary-50/80 dark:bg-primary-900/20'
                     )}
                   >
                     <div className="flex items-center gap-3">
-                       <div className="relative shrink-0">
+                      <div className="relative shrink-0">
                         {other?.role === 'moderator' || other?.role === 'admin' || other?.role === 'super_admin' ? (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
-                            <Shield size={18} />
+                          <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                            <Shield size={20} />
                           </div>
                         ) : (
-                          <Avatar src={other?.avatar_url} name={other?.full_name || ''} size="sm" />
+                          <Avatar src={other?.avatar_url} name={other?.full_name || ''} size="md" />
                         )}
+                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" title="Online" />
                         {hasUnread && (
                           <motion.span
                             key={conv.unread_count}
                             initial={{ scale: 0.5 }}
                             animate={{ scale: 1 }}
-                            className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-primary-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none px-0.5"
+                            className="absolute -top-1 -right-1 min-w-[18px] h-4.5 bg-primary-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none px-1 shadow-sm"
                           >
                             {conv.unread_count! > 9 ? '9+' : conv.unread_count}
                           </motion.span>
@@ -176,7 +183,7 @@ const ChatPage: React.FC = () => {
                             'text-sm truncate flex items-center gap-1.5',
                             hasUnread
                               ? 'font-bold text-slate-900 dark:text-slate-100'
-                              : 'font-medium text-slate-700 dark:text-slate-300'
+                              : 'font-semibold text-slate-800 dark:text-slate-200'
                           )}>
                             {other?.role === 'moderator' || other?.role === 'admin' || other?.role === 'super_admin' ? 'All in One' : other?.full_name}
                             {(other?.role === 'moderator' || other?.role === 'admin' || other?.role === 'super_admin') && (
@@ -190,19 +197,19 @@ const ChatPage: React.FC = () => {
                           </span>
                         </div>
                         {conv.listing && showListingContext && (
-                          <p className="text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                            {truncate(conv.listing.title, 30)}
+                          <p className="text-xs text-primary-600 dark:text-primary-400 font-medium truncate mt-0.5">
+                            {truncate(conv.listing.title, 32)}
                           </p>
                         )}
                         {conv.last_message && (
                           <p className={cn(
                             'text-xs truncate mt-0.5',
                             hasUnread
-                              ? 'text-slate-800 dark:text-slate-200 font-semibold'
+                              ? 'text-slate-900 dark:text-slate-100 font-semibold'
                               : 'text-slate-400 dark:text-slate-500'
                           )}>
                             {conv.last_message.sender_id === user.id ? 'You: ' : ''}
-                            {conv.last_message.content}
+                            {lastMsgText}
                           </p>
                         )}
                       </div>

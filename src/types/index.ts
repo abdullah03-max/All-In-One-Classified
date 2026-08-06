@@ -74,6 +74,8 @@ export interface Message {
   content: string;
   created_at: string;
   is_read: boolean;
+  is_deleted?: boolean;
+  deleted_for_users?: string[];
   sender?: User;
 }
 

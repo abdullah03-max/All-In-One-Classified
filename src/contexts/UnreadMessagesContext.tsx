@@ -50,6 +50,12 @@ export const UnreadMessagesProvider: React.FC<{ children: React.ReactNode }> = (
   }, [user, fetchUnreadCount]);
 
   useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  useEffect(() => {
     if (!user) { setTotalUnread(0); return; }
 
     // Initial fetch
@@ -64,13 +70,44 @@ export const UnreadMessagesProvider: React.FC<{ children: React.ReactNode }> = (
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          // Any new message — we'll check sender below
         },
-        (payload) => {
+        async (payload) => {
           if (payload.new.sender_id !== user.id) {
             // Message from someone else → bump badge & ring chime
             setTotalUnread(prev => prev + 1);
             playNotificationSound();
+
+            // Native Browser Notification
+            if ('Notification' in window && Notification.permission === 'granted') {
+              try {
+                const { data: senderProfile } = await supabase
+                  .from('users')
+                  .select('full_name, avatar_url, role')
+                  .eq('id', payload.new.sender_id)
+                  .single();
+
+                const isSystem = senderProfile?.role === 'admin' || senderProfile?.role === 'super_admin' || senderProfile?.role === 'moderator';
+                const senderName = isSystem ? 'All in One' : (senderProfile?.full_name || 'New Message');
+
+                const content = payload.new.content || '';
+                const contentPreview = content.startsWith('[Voice Message]')
+                  ? '🎤 Voice message'
+                  : (content.startsWith('[Image]') ? '📷 Image' : content.slice(0, 80));
+
+                const notif = new Notification(senderName, {
+                  body: contentPreview || 'You received a new message',
+                  icon: senderProfile?.avatar_url || undefined,
+                  tag: `msg-${payload.new.conversation_id}`,
+                });
+
+                notif.onclick = () => {
+                  window.focus();
+                  window.location.href = `/chat?conv=${payload.new.conversation_id}`;
+                };
+              } catch {
+                // Silently ignore browser notification errors
+              }
+            }
           }
         }
       )
@@ -82,7 +119,6 @@ export const UnreadMessagesProvider: React.FC<{ children: React.ReactNode }> = (
           table: 'messages',
         },
         (payload) => {
-          // When is_read flips to true, re-fetch accurate count
           if (payload.new.is_read === true && payload.old.is_read === false) {
             fetchUnreadCount();
           }

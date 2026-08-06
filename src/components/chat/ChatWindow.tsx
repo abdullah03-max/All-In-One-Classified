@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Image as ImageIcon, CheckCheck, Wifi, WifiOff, Mic, Trash2, ArrowLeft, Shield, Lock } from 'lucide-react';
+import { Send, Image as ImageIcon, CheckCheck, Wifi, WifiOff, Mic, Trash2, ArrowLeft, Shield, Lock, ChevronDown } from 'lucide-react';
 import { Message, Conversation } from '../../types';
 import { chatService } from '../../services/chatService';
 import { Avatar, Spinner } from '../ui';
@@ -25,6 +25,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [connected, setConnected] = useState(true);
+  const [activeActionMsg, setActiveActionMsg] = useState<Message | null>(null);
 
   // Voice recording states
   const [isRecording, setIsRecording] = useState(false);
@@ -96,24 +97,31 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
 
     load();
 
-    // Supabase Realtime subscription for incoming messages
-    channel = chatService.subscribeToMessages(conversation.id, (msg) => {
-      setMessages(prev => {
-        // Skip if already present or locally added
-        if (prev.some(m => m.id === msg.id)) return prev;
-        if (localMessageIds.current.has(msg.id)) return prev;
-        return [...prev, msg];
-      });
+    // Supabase Realtime subscription for incoming and updated messages
+    channel = chatService.subscribeToMessages(
+      conversation.id,
+      (msg) => {
+        setMessages(prev => {
+          // Skip if already present or locally added
+          if (prev.some(m => m.id === msg.id)) return prev;
+          if (localMessageIds.current.has(msg.id)) return prev;
+          return [...prev, msg];
+        });
 
-      // Mark read if message is from the other person
-      if (user && msg.sender_id !== user.id) {
-        chatService.markMessagesRead(conversation.id, user.id);
-        markConversationReadRef.current(conversation.id);
+        // Mark read if message is from the other person
+        if (user && msg.sender_id !== user.id) {
+          chatService.markMessagesRead(conversation.id, user.id);
+          markConversationReadRef.current(conversation.id);
+        }
+
+        // Notify sidebar to refresh
+        onMessageSentRef.current?.();
+      },
+      (updatedMsg) => {
+        setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+        onMessageSentRef.current?.();
       }
-
-      // Notify sidebar to refresh
-      onMessageSentRef.current?.();
-    });
+    );
 
     // Track connection status for the indicator
     channel.on('system' as any, {}, (payload: any) => {
@@ -274,9 +282,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
+  // Filter messages deleted for current user
+  const visibleMessages = messages.filter(m => {
+    if (!user) return true;
+    const isDeletedLocally = typeof window !== 'undefined' && localStorage.getItem(`deleted_msg_${user.id}_${m.id}`) === 'true';
+    const isDeletedInDb = Array.isArray(m.deleted_for_users) && m.deleted_for_users.includes(user.id);
+    return !isDeletedLocally && !isDeletedInDb;
+  });
+
   // Group messages by date
   const grouped: { date: string; messages: Message[] }[] = [];
-  messages.forEach(msg => {
+  visibleMessages.forEach(msg => {
     const date = new Date(msg.created_at).toLocaleDateString('en-PK', {
       day: 'numeric', month: 'long', year: 'numeric',
     });
@@ -285,7 +301,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
     else grouped.push({ date, messages: [msg] });
   });
 
-  const isSystemChat = otherUser?.role === 'moderator' || otherUser?.role === 'admin' || otherUser?.role === 'super_admin';
+  const isSystemChat = conversation.buyer?.role === 'moderator' || conversation.buyer?.role === 'admin' || conversation.buyer?.role === 'super_admin' ||
+                       conversation.seller?.role === 'moderator' || conversation.seller?.role === 'admin' || conversation.seller?.role === 'super_admin';
+
   const isCurrentUserModerator = user?.role === 'moderator' || user?.role === 'admin' || user?.role === 'super_admin';
   const showReadOnlyFooter = isSystemChat && !isCurrentUserModerator;
 
@@ -296,14 +314,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
   })();
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden relative">
 
       {/* ── Header ── (fixed, never scrolls) */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
         {onBack && (
           <button
             onClick={onBack}
-            className="md:hidden p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors shrink-0"
+            className="md:hidden p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors shrink-0 cursor-pointer"
             title="Back to list"
           >
             <ArrowLeft size={18} />
@@ -378,7 +396,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
           <div className="flex justify-center items-center h-full">
             <Spinner />
           </div>
-        ) : messages.length === 0 ? (
+        ) : visibleMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-8">
             <div className="w-14 h-14 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mb-3">
               <ImageIcon size={22} className="text-slate-400" />
@@ -443,6 +461,27 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
                   );
                 }
 
+                // Render deleted message bubble
+                if (msg.is_deleted || msg.content === 'This message was deleted.') {
+                  return (
+                    <motion.div
+                      key={msg.id}
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className={cn(
+                        'flex gap-2 mb-1.5',
+                        isMine ? 'justify-end' : 'justify-start'
+                      )}
+                    >
+                      <div className="px-3.5 py-1.5 text-xs italic text-slate-400 dark:text-slate-500 bg-slate-100/80 dark:bg-slate-800/60 rounded-2xl flex items-center gap-1.5 border border-slate-200/50 dark:border-slate-700/50">
+                        <Trash2 size={12} className="text-slate-400 shrink-0" />
+                        <span>This message was deleted.</span>
+                      </div>
+                    </motion.div>
+                  );
+                }
+
                 return (
                   <motion.div
                     key={msg.id}
@@ -451,7 +490,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={{ duration: 0.16, ease: 'easeOut' }}
                     className={cn(
-                      'flex gap-2',
+                      'flex gap-2 group/msg',
                       isMine ? 'justify-end' : 'justify-start',
                       isGroupEnd ? 'mb-3' : 'mb-0.5'
                     )}
@@ -466,45 +505,60 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
                     )}
 
                     <div className={cn(
-                      'max-w-[72%] flex flex-col',
-                      isMine ? 'items-end' : 'items-start'
+                      'max-w-[75%] flex items-center gap-1',
+                      isMine ? 'flex-row' : 'flex-row-reverse'
                     )}>
-                      {isVoiceMessage ? (
-                        <AudioPlayer src={msg.content.slice(8)} isMine={isMine} />
-                      ) : (
-                        <div className={cn(
-                          'px-3.5 py-2 text-sm leading-relaxed break-words',
-                          isMine
-                            ? [
-                                'bg-primary-600 text-white',
-                                isGroupStart ? 'rounded-t-2xl rounded-l-2xl rounded-br-sm' : 'rounded-l-2xl rounded-r-sm',
-                                isGroupEnd && 'rounded-b-2xl',
-                            ]
-                            : [
-                                'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm',
-                                isGroupStart ? 'rounded-t-2xl rounded-r-2xl rounded-bl-sm' : 'rounded-r-2xl rounded-l-sm',
-                                isGroupEnd && 'rounded-b-2xl',
-                            ]
-                        )}>
-                          {msg.content}
-                        </div>
-                      )}
+                      {/* Delete action button */}
+                      <button
+                        type="button"
+                        onClick={() => setActiveActionMsg(msg)}
+                        className="opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded shrink-0 cursor-pointer"
+                        title="Delete options"
+                      >
+                        <ChevronDown size={14} />
+                      </button>
 
-                      {/* Timestamp + read receipt — only at end of a group */}
-                      {isGroupEnd && (
-                        <div className={cn(
-                          'flex items-center gap-1 mt-1 px-0.5',
-                          isMine ? 'justify-end' : 'justify-start'
-                        )}>
-                          <span className="text-[10px] text-slate-400">{formatDate(msg.created_at)}</span>
-                          {isMine && (
-                            <CheckCheck
-                              size={11}
-                              className={msg.is_read ? 'text-primary-500' : 'text-slate-400'}
-                            />
-                          )}
-                        </div>
-                      )}
+                      <div className={cn(
+                        'flex flex-col',
+                        isMine ? 'items-end' : 'items-start'
+                      )}>
+                        {isVoiceMessage ? (
+                          <AudioPlayer src={msg.content.slice(8)} isMine={isMine} />
+                        ) : (
+                          <div className={cn(
+                            'px-3.5 py-2 text-sm leading-relaxed break-words',
+                            isMine
+                              ? [
+                                  'bg-primary-600 text-white',
+                                  isGroupStart ? 'rounded-t-2xl rounded-l-2xl rounded-br-sm' : 'rounded-l-2xl rounded-r-sm',
+                                  isGroupEnd && 'rounded-b-2xl',
+                               ]
+                              : [
+                                  'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm',
+                                  isGroupStart ? 'rounded-t-2xl rounded-r-2xl rounded-bl-sm' : 'rounded-r-2xl rounded-l-sm',
+                                  isGroupEnd && 'rounded-b-2xl',
+                               ]
+                          )}>
+                            {msg.content}
+                          </div>
+                        )}
+
+                        {/* Timestamp + read receipt */}
+                        {isGroupEnd && (
+                          <div className={cn(
+                            'flex items-center gap-1 mt-1 px-0.5',
+                            isMine ? 'justify-end' : 'justify-start'
+                          )}>
+                            <span className="text-[10px] text-slate-400">{formatDate(msg.created_at)}</span>
+                            {isMine && (
+                              <CheckCheck
+                                size={11}
+                                className={msg.is_read ? 'text-primary-500' : 'text-slate-400'}
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 );
@@ -513,6 +567,73 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
           </div>
         ))}
       </div>
+
+      {/* ── Delete Options Modal (WhatsApp Style) ── */}
+      {activeActionMsg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white dark:bg-slate-900 rounded-2xl max-w-xs w-full p-4 shadow-xl border border-slate-200 dark:border-slate-800 space-y-3"
+          >
+            <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm border-b border-slate-100 dark:border-slate-800 pb-2">
+              Delete message?
+            </h3>
+
+            {activeActionMsg.sender_id === user?.id && !activeActionMsg.is_deleted && activeActionMsg.content !== 'This message was deleted.' && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const target = activeActionMsg;
+                  setActiveActionMsg(null);
+                  try {
+                    await chatService.deleteMessageForEveryone(target.id);
+                    setMessages(prev => prev.map(m => m.id === target.id ? { ...m, is_deleted: true, content: 'This message was deleted.' } : m));
+                    toast.success('Deleted for everyone');
+                    onMessageSentRef.current?.();
+                  } catch {
+                    toast.error('Failed to delete message');
+                  }
+                }}
+                className="w-full text-left py-2.5 px-3 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-sm font-semibold rounded-xl transition-colors flex items-center justify-between cursor-pointer"
+              >
+                <span>Delete for Everyone</span>
+                <Trash2 size={16} />
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={async () => {
+                const target = activeActionMsg;
+                setActiveActionMsg(null);
+                if (user) {
+                  try {
+                    await chatService.deleteMessageForMe(target.id, user.id);
+                    setMessages(prev => prev.filter(m => m.id !== target.id));
+                    toast.success('Deleted for me');
+                    onMessageSentRef.current?.();
+                  } catch {
+                    toast.error('Failed to delete message');
+                  }
+                }
+              }}
+              className="w-full text-left py-2.5 px-3 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium rounded-xl transition-colors flex items-center justify-between cursor-pointer"
+            >
+              <span>Delete for Me</span>
+              <Trash2 size={16} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveActionMsg(null)}
+              className="w-full text-center py-2 text-slate-500 dark:text-slate-400 text-xs font-semibold hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+            >
+              Cancel
+            </button>
+          </motion.div>
+        </div>
+      )}
 
       {/* Uploading progress overlay */}
       {uploadingProgress !== null && (
