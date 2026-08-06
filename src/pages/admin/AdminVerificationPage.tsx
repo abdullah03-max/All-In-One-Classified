@@ -271,7 +271,7 @@ export const AdminVerificationPage: React.FC = () => {
 
         {/* Detailed Application Review Modal */}
         {selectedApp && (
-          <Modal isOpen={!!selectedApp} onClose={() => setSelectedApp(null)} className="max-w-4xl">
+          <Modal isOpen={!!selectedApp} onClose={() => setSelectedApp(null)} size="full" className="max-w-4xl">
             <div className="p-6 space-y-6 max-h-[85vh] overflow-y-auto">
               <div className="flex justify-between items-start border-b border-slate-100 dark:border-slate-800 pb-3">
                 <div>

@@ -162,9 +162,10 @@ interface ModalProps {
   title?: string;
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  className?: string;
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 'md' }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 'md', className }) => {
   const sizes = {
     sm: 'max-w-sm',
     md: 'max-w-md',
@@ -191,7 +192,8 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className={cn(
               'relative bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto',
-              sizes[size]
+              sizes[size],
+              className
             )}
           >
             {title && (
