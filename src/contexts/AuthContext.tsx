@@ -47,7 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Creates a public.users profile from auth user metadata (called on first login after email verify or Google OAuth)
+  // Creates or updates public.users profile safely without triggering 409 Conflict or 406 Not Acceptable errors
   const ensureProfile = useCallback(async (authUser: { id: string; email?: string; user_metadata?: Record<string, any>; phone?: string }) => {
     const meta = authUser.user_metadata || {};
     const role = (meta.role as string) || 'buyer';
@@ -56,8 +56,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const userName = meta.full_name || meta.name || meta.preferred_username || (authUser.email ? authUser.email.split('@')[0] : 'Member');
 
-    // 1. Try upserting all columns (roles, email_verified)
-    const { error: firstError } = await supabase.from('users').upsert({
+    // Send welcome email ONCE per user
+    const triggerWelcomeEmail = async () => {
+      if (authUser.email && typeof window !== 'undefined') {
+        const emailSentKey = `welcome_email_sent_${authUser.id}`;
+        if (!localStorage.getItem(emailSentKey)) {
+          localStorage.setItem(emailSentKey, 'true');
+          try {
+            await usersService.sendWelcomeEmail({ email: authUser.email, name: userName });
+          } catch (emailErr) {
+            console.error('Welcome email dispatch error:', emailErr);
+          }
+        }
+      }
+    };
+
+    // 1. Check if user profile already exists to prevent 409 Conflict
+    const { data: existingProfile } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', authUser.id)
+      .maybeSingle();
+
+    if (existingProfile) {
+      // Profile exists -> perform silent update
+      await supabase
+        .from('users')
+        .update({
+          full_name: userName,
+          phone: meta.phone || authUser.phone || null,
+          role: primaryRole,
+          roles,
+          is_active: true,
+        })
+        .eq('id', authUser.id);
+
+      await triggerWelcomeEmail();
+      return;
+    }
+
+    // 2. Profile does not exist -> insert new profile
+    const { error: insertErr } = await supabase.from('users').insert({
       id: authUser.id,
       email: authUser.email || '',
       full_name: userName,
@@ -67,26 +106,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       is_verified: false,
       email_verified: true,
       is_active: true,
-    }, { onConflict: 'id' });
+    });
 
-    if (!firstError) {
-      if (authUser.email) {
-        try {
-          await usersService.sendWelcomeEmail({ email: authUser.email, name: userName });
-        } catch (emailErr) {
-          console.error('Welcome email dispatch error:', emailErr);
-        }
-      }
+    if (!insertErr) {
+      await triggerWelcomeEmail();
       return;
     }
 
-    console.error('First profile upsert failed:', firstError);
-
-    // 2. If it failed, try without email_verified or roles in case migration is not run yet
-    const hasEmailVerifiedError = /email_verified|column.*email_verified/i.test(firstError.message || '');
-    const hasRolesError = /roles|column.*roles/i.test(firstError.message || '');
-
-    const fallbackData: Record<string, any> = {
+    // 3. Fallback insert without roles/email_verified columns if migration was not run
+    const { error: fallbackErr } = await supabase.from('users').insert({
       id: authUser.id,
       email: authUser.email || '',
       full_name: userName,
@@ -94,48 +122,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       role: primaryRole,
       is_verified: false,
       is_active: true,
-    };
+    });
 
-    if (!hasRolesError) {
-      fallbackData.roles = roles;
-    }
-    if (!hasEmailVerifiedError) {
-      fallbackData.email_verified = true;
-    }
-
-    const { error: fallbackError } = await supabase.from('users').upsert(fallbackData, { onConflict: 'id' });
-    if (!fallbackError) {
-      if (authUser.email) {
-        try {
-          await usersService.sendWelcomeEmail({ email: authUser.email, name: userName });
-        } catch (emailErr) {
-          console.error('Welcome email dispatch error:', emailErr);
-        }
-      }
-      return;
-    }
-
-    if (fallbackError) {
-      console.error('Fallback profile upsert failed:', fallbackError);
-      
-      // 3. Absolute minimum fallback (no roles, no email_verified)
-      const { error: finalError } = await supabase.from('users').upsert({
-        id: authUser.id,
-        email: authUser.email || '',
-        full_name: userName,
-        phone: meta.phone || authUser.phone || null,
-        role: primaryRole,
-        is_verified: false,
-        is_active: true,
-      }, { onConflict: 'id' });
-      
-      if (!finalError && authUser.email) {
-        try {
-          await usersService.sendWelcomeEmail({ email: authUser.email, name: userName });
-        } catch (emailErr) {
-          console.error('Welcome email dispatch error:', emailErr);
-        }
-      }
+    if (!fallbackErr) {
+      await triggerWelcomeEmail();
     }
   }, []);
 
