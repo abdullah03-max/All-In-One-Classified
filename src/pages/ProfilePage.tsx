@@ -335,7 +335,9 @@ export const ProfilePage: React.FC = () => {
                   <div className="flex items-center gap-1.5">
                     <p className="font-semibold text-slate-900 dark:text-slate-100">{user?.full_name}</p>
                     {user?.is_verified ? (
-                      <CheckCircle size={16} className="text-emerald-500 fill-emerald-500/10 shrink-0" title="Verified User" />
+                      <span title="Verified User">
+                        <CheckCircle size={16} className="text-emerald-500 fill-emerald-500/10 shrink-0" />
+                      </span>
                     ) : (
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-slate-100 dark:bg-slate-800 text-slate-500">Unverified</span>
                     )}
