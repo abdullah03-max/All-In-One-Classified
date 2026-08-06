@@ -610,7 +610,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
                             {isMine && (
                               msg.is_read ? (
                                 <CheckCheck size={14} className="text-blue-500 font-bold shrink-0" title="Seen" />
-                              ) : msg.is_delivered ? (
+                              ) : (msg.is_delivered || (otherUser && isUserOnline(otherUser.id, otherUser.role))) ? (
                                 <CheckCheck size={14} className="text-slate-400 shrink-0" title="Delivered" />
                               ) : (
                                 <Check size={14} className="text-slate-400 shrink-0" title="Sent" />

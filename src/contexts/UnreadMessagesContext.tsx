@@ -77,7 +77,7 @@ export const UnreadMessagesProvider: React.FC<{ children: React.ReactNode }> = (
             setTotalUnread(prev => prev + 1);
             playNotificationSound();
 
-            // Native Browser Notification
+            // Native Mobile & Desktop Web Push Notification
             if ('Notification' in window && Notification.permission === 'granted') {
               try {
                 const { data: senderProfile } = await supabase
@@ -90,16 +90,32 @@ export const UnreadMessagesProvider: React.FC<{ children: React.ReactNode }> = (
                 const senderName = isSystem ? 'All in One' : (senderProfile?.full_name || 'New Message');
 
                 const content = payload.new.content || '';
-                const contentPreview = content.startsWith('[Voice Message]')
+                const contentPreview = content.startsWith('[audio]:') || content.startsWith('[Voice Message]')
                   ? '🎤 Voice message'
                   : (content.startsWith('[Image]') ? '📷 Image' : content.slice(0, 80));
 
-                const notif = new Notification(senderName, {
+                const notifOptions = {
                   body: contentPreview || 'You received a new message',
-                  icon: senderProfile?.avatar_url || undefined,
+                  icon: senderProfile?.avatar_url || '/pwa-192x192.png',
+                  badge: '/pwa-192x192.png',
                   tag: `msg-${payload.new.conversation_id}`,
-                });
+                  data: { url: `/chat?conv=${payload.new.conversation_id}` },
+                  vibrate: [200, 100, 200],
+                };
 
+                // Trigger via Service Worker for Mobile (Android Chrome, Edge, Samsung Internet)
+                if ('serviceWorker' in navigator) {
+                  try {
+                    const reg = await navigator.serviceWorker.ready;
+                    if (reg && reg.showNotification) {
+                      await reg.showNotification(senderName, notifOptions);
+                      return;
+                    }
+                  } catch {}
+                }
+
+                // Fallback for Desktop browsers
+                const notif = new Notification(senderName, notifOptions);
                 notif.onclick = () => {
                   window.focus();
                   window.location.href = `/chat?conv=${payload.new.conversation_id}`;
