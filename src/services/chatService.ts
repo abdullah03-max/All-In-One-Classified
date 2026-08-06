@@ -16,12 +16,31 @@ export const chatService = {
       .order('updated_at', { ascending: false });
     if (error) throw error;
 
-    const list = (data as unknown as (Conversation & { messages: Message[] })[]).map(conv => ({
-      ...conv,
-      last_message: conv.messages?.sort((a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0],
-      unread_count: conv.messages?.filter(m => !m.is_read && m.sender_id !== userId).length || 0,
-    }));
+    const list = (data as unknown as (Conversation & { messages: Message[] })[]).map(conv => {
+      const sortedMsgs = conv.messages?.sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const lastMsg = sortedMsgs?.[0];
+
+      let isLocallyRead = false;
+      if (lastMsg && typeof window !== 'undefined') {
+        const readCheckpoint = localStorage.getItem(`read_checkpoint_${userId}_${conv.id}`);
+        if (readCheckpoint) {
+          if (readCheckpoint === lastMsg.id || new Date(readCheckpoint).getTime() >= new Date(lastMsg.created_at).getTime()) {
+            isLocallyRead = true;
+          }
+        }
+      }
+
+      const unreadCount = isLocallyRead
+        ? 0
+        : (conv.messages?.filter(m => !m.is_read && m.sender_id !== userId).length || 0);
+
+      return {
+        ...conv,
+        last_message: lastMsg,
+        unread_count: unreadCount,
+      };
+    });
 
     return list.sort((a, b) => {
       const timeA = a.last_message ? new Date(a.last_message.created_at).getTime() : new Date(a.updated_at || a.created_at).getTime();
@@ -104,6 +123,10 @@ export const chatService = {
 
   async markMessagesRead(conversationId: string, userId: string): Promise<void> {
     try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`read_checkpoint_${userId}_${conversationId}`, new Date().toISOString());
+      }
+
       const { error } = await supabase.rpc('mark_messages_read', {
         p_conversation_id: conversationId,
         p_user_id: userId,

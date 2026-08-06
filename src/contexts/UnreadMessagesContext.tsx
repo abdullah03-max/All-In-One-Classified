@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
+import { chatService } from '../services/chatService';
 import { playNotificationSound } from '../utils/helpers';
 
 interface UnreadMessagesContextType {
@@ -22,21 +23,9 @@ export const UnreadMessagesProvider: React.FC<{ children: React.ReactNode }> = (
   const fetchUnreadCount = useCallback(async () => {
     if (!user) { setTotalUnread(0); return; }
     try {
-      const { count } = await supabase
-        .from('messages')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_read', false)
-        .neq('sender_id', user.id)
-        // Only count messages in conversations this user participates in
-        .in(
-          'conversation_id',
-          (await supabase
-            .from('conversations')
-            .select('id')
-            .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
-          ).data?.map(c => c.id) ?? []
-        );
-      setTotalUnread(count ?? 0);
+      const convs = await chatService.getConversations(user.id);
+      const total = convs.reduce((sum, c) => sum + (c.unread_count || 0), 0);
+      setTotalUnread(total);
     } catch {
       // silently ignore
     }
