@@ -252,28 +252,13 @@ export const ProfilePage: React.FC = () => {
 
   // Delete Account Action
   const handleDeleteAccount = async () => {
-    if (!user?.email || !deleteConfirmPassword) {
-      toast.error('Please enter your password to confirm account deletion');
-      return;
-    }
+    if (!user?.id) return;
     setDeleteLoading(true);
     try {
-      // 1. Verify password before permanent deletion
-      const { error: authErr } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: deleteConfirmPassword,
-      });
-
-      if (authErr) {
-        toast.error('Incorrect password. Account deletion cancelled.');
-        setDeleteLoading(false);
-        return;
-      }
-
-      // 2. Delete all database records for this user
+      // Delete all database records for this user
       await usersService.deleteUserAccount(user.id);
 
-      // 3. Sign out and redirect
+      // Sign out and redirect
       await signOut();
       toast.success('Your account has been permanently deleted.');
       navigate('/');
@@ -702,7 +687,7 @@ export const ProfilePage: React.FC = () => {
       {/* ============================================================ */}
       <Modal
         isOpen={showDeleteModal}
-        onClose={() => { setShowDeleteModal(false); setDeleteConfirmPassword(''); }}
+        onClose={() => setShowDeleteModal(false)}
         title="Delete Account Permanently"
         size="md"
       >
@@ -710,30 +695,17 @@ export const ProfilePage: React.FC = () => {
           <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-xl flex items-start gap-3 text-red-700 dark:text-red-400 text-xs">
             <AlertTriangle size={18} className="shrink-0 mt-0.5 text-red-600" />
             <div>
-              <p className="font-bold mb-0.5">Warning: This action cannot be undone.</p>
+              <p className="font-bold mb-0.5">Are you sure? This action cannot be undone.</p>
               <p>Deleting your account will permanently wipe your profile, active listings, offers, bookmarks, chats, and notifications from the platform.</p>
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Enter your password to confirm
-            </label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={deleteConfirmPassword}
-              onChange={(e) => setDeleteConfirmPassword(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
-            />
-          </div>
-
           <div className="flex justify-end gap-3 pt-3">
-            <Button variant="secondary" type="button" onClick={() => { setShowDeleteModal(false); setDeleteConfirmPassword(''); }}>
+            <Button variant="secondary" type="button" onClick={() => setShowDeleteModal(false)}>
               Cancel
             </Button>
             <Button variant="danger" type="button" onClick={handleDeleteAccount} loading={deleteLoading} disabled={deleteLoading}>
-              Permanently Delete Account
+              Yes, Delete My Account
             </Button>
           </div>
         </div>
