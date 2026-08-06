@@ -1659,5 +1659,10 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.check_email_exists(text) TO anon, authenticated, service_role;
 
+-- Columns for message deletion
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS deleted_for_users TEXT[] DEFAULT '{}';
+
+
 
 
