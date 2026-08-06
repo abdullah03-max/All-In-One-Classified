@@ -105,6 +105,8 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     pendingOfferRef.current = null;
   }, []);
 
+  const iceCandidatesQueueRef = useRef<RTCIceCandidateInit[]>([]);
+
   // Send Broadcast Signal via Supabase
   const sendSignal = useCallback(async (targetUserId: string, type: string, payload: any) => {
     const channel = supabase.channel(`call-signaling-${targetUserId}`);
@@ -119,6 +121,41 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     });
   }, [user?.id]);
+
+  // Create Peer Connection with event listeners
+  const createPeerConnection = useCallback((targetUserId: string) => {
+    const pc = new RTCPeerConnection(RTC_CONFIG);
+    pcRef.current = pc;
+    iceCandidatesQueueRef.current = [];
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        sendSignal(targetUserId, 'ice-candidate', { candidate: event.candidate });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      if (remoteAudioRef.current && event.streams[0]) {
+        remoteAudioRef.current.srcObject = event.streams[0];
+        remoteAudioRef.current.volume = 1.0;
+        remoteAudioRef.current.play().catch(() => {});
+      }
+    };
+
+    return pc;
+  }, [sendSignal]);
+
+  const processIceQueue = async () => {
+    if (!pcRef.current) return;
+    while (iceCandidatesQueueRef.current.length > 0) {
+      const candidate = iceCandidatesQueueRef.current.shift();
+      if (candidate) {
+        try {
+          await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch {}
+      }
+    }
+  };
 
   // Listen for Incoming Signals
   useEffect(() => {
@@ -135,16 +172,44 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           pendingOfferRef.current = payload;
           setCallState('ringing');
           playRingtone();
+
+          // Push Web Notification for mobile / background
+          if ('Notification' in window && Notification.permission === 'granted') {
+            const notifOptions = {
+              body: `Incoming audio call from ${payload.callerUser?.full_name || 'User'}`,
+              icon: payload.callerUser?.avatar_url || '/pwa-192x192.png',
+              badge: '/pwa-192x192.png',
+              tag: `call-${payload.conversationId}`,
+              data: { url: `/chat?conv=${payload.conversationId}` },
+              vibrate: [500, 200, 500, 200, 500],
+            };
+            if ('serviceWorker' in navigator) {
+              try {
+                const reg = await navigator.serviceWorker.ready;
+                if (reg && reg.showNotification) {
+                  await reg.showNotification(`📞 Call from ${payload.callerUser?.full_name}`, notifOptions);
+                }
+              } catch {}
+            }
+          }
         } else if (payload.type === 'answer') {
           if (pcRef.current && payload.sdp) {
             await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+            await processIceQueue();
             setCallState('connected');
+            if (remoteAudioRef.current) {
+              remoteAudioRef.current.play().catch(() => {});
+            }
           }
         } else if (payload.type === 'ice-candidate') {
-          if (pcRef.current && payload.candidate) {
-            try {
-              await pcRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate));
-            } catch {}
+          if (payload.candidate) {
+            if (pcRef.current && pcRef.current.remoteDescription) {
+              try {
+                await pcRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate));
+              } catch {}
+            } else {
+              iceCandidatesQueueRef.current.push(payload.candidate);
+            }
           }
         } else if (payload.type === 'rejected') {
           toast.error('Call declined');
@@ -196,25 +261,10 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
 
-      const pc = new RTCPeerConnection(RTC_CONFIG);
-      pcRef.current = pc;
-
+      const pc = createPeerConnection(targetUser.id);
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          sendSignal(targetUser.id, 'ice-candidate', { candidate: event.candidate });
-        }
-      };
-
-      pc.ontrack = (event) => {
-        if (remoteAudioRef.current && event.streams[0]) {
-          remoteAudioRef.current.srcObject = event.streams[0];
-          remoteAudioRef.current.play().catch(() => {});
-        }
-      };
-
-      const offer = await pc.createOffer();
+      const offer = await pc.createOffer({ offerToReceiveAudio: true });
       await pc.setLocalDescription(offer);
 
       sendSignal(targetUser.id, 'offer', {
@@ -234,7 +284,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setActiveTargetUser(null);
       cleanupCall();
     }
-  }, [user, sendSignal, playRingtone, cleanupCall]);
+  }, [user, sendSignal, createPeerConnection, playRingtone, cleanupCall]);
 
   // Accept Incoming Call
   const acceptCall = useCallback(async () => {
@@ -243,36 +293,26 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
 
-      const pc = new RTCPeerConnection(RTC_CONFIG);
-      pcRef.current = pc;
-
+      const pc = createPeerConnection(activeTargetUser.id);
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          sendSignal(activeTargetUser.id, 'ice-candidate', { candidate: event.candidate });
-        }
-      };
-
-      pc.ontrack = (event) => {
-        if (remoteAudioRef.current && event.streams[0]) {
-          remoteAudioRef.current.srcObject = event.streams[0];
-          remoteAudioRef.current.play().catch(() => {});
-        }
-      };
-
       await pc.setRemoteDescription(new RTCSessionDescription(pendingOfferRef.current.sdp));
+      await processIceQueue();
 
-      const answer = await pc.createAnswer();
+      const answer = await pc.createAnswer({ offerToReceiveAudio: true });
       await pc.setLocalDescription(answer);
 
       sendSignal(activeTargetUser.id, 'answer', { sdp: answer });
       setCallState('connected');
+
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.play().catch(() => {});
+      }
     } catch (err: any) {
       toast.error('Could not access microphone');
       rejectCall();
     }
-  }, [user, activeTargetUser, sendSignal]);
+  }, [user, activeTargetUser, sendSignal, createPeerConnection]);
 
   // Reject Incoming Call
   const rejectCall = useCallback(() => {

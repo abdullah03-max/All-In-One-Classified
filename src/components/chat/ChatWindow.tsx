@@ -125,6 +125,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
       (updatedMsg) => {
         setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
         onMessageSentRef.current?.();
+      },
+      (readerId) => {
+        if (user && readerId !== user.id) {
+          setMessages(prev => prev.map(m => m.sender_id === user.id ? { ...m, is_read: true, is_delivered: true } : m));
+        }
       }
     );
 
@@ -400,11 +405,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
           <button
             type="button"
             onClick={() => {
-              const isOtherOnline = isUserOnline(otherUser.id, otherUser.role);
-              if (!isOtherOnline) {
-                toast.error('User is offline');
-                return;
-              }
               initiateCall({
                 id: otherUser.id,
                 full_name: otherUser.full_name || 'User',
