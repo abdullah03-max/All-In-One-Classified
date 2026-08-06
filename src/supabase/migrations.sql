@@ -1664,6 +1664,32 @@ ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT 
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS is_delivered BOOLEAN DEFAULT false;
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS deleted_for_users TEXT[] DEFAULT '{}';
 
+-- RPC function to mark all messages in a conversation as read by a participant (bypassing RLS update restrictions)
+CREATE OR REPLACE FUNCTION public.mark_messages_read(
+  p_conversation_id UUID,
+  p_user_id UUID
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.conversations
+    WHERE id = p_conversation_id
+    AND (buyer_id = p_user_id OR seller_id = p_user_id)
+  ) THEN
+    UPDATE public.messages
+    SET is_read = true, is_delivered = true
+    WHERE conversation_id = p_conversation_id
+    AND sender_id != p_user_id;
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.mark_messages_read(UUID, UUID) TO anon, authenticated, service_role;
+
+
 
 
 

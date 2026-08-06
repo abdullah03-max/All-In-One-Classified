@@ -104,11 +104,18 @@ export const chatService = {
 
   async markMessagesRead(conversationId: string, userId: string): Promise<void> {
     try {
-      await supabase
-        .from('messages')
-        .update({ is_read: true, is_delivered: true })
-        .eq('conversation_id', conversationId)
-        .neq('sender_id', userId);
+      const { error } = await supabase.rpc('mark_messages_read', {
+        p_conversation_id: conversationId,
+        p_user_id: userId,
+      });
+
+      if (error) {
+        await supabase
+          .from('messages')
+          .update({ is_read: true, is_delivered: true })
+          .eq('conversation_id', conversationId)
+          .neq('sender_id', userId);
+      }
     } catch {
       await supabase
         .from('messages')
