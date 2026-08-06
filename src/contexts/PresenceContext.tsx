@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
+import { chatService } from '../services/chatService';
+
 interface PresenceContextType {
   onlineUserIds: Set<string>;
   isUserOnline: (userId?: string | null, role?: string | null) => boolean;
@@ -23,6 +25,9 @@ export const PresenceProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setOnlineUserIds(new Set());
       return;
     }
+
+    // Immediately trigger delivery mark for pending messages
+    chatService.markMessagesDelivered(user.id);
 
     const channel = supabase.channel('global-presence', {
       config: {
@@ -46,9 +51,11 @@ export const PresenceProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     channel
       .on('presence', { event: 'sync' }, () => {
         updatePresenceState();
+        if (user?.id) chatService.markMessagesDelivered(user.id);
       })
       .on('presence', { event: 'join' }, ({ key }) => {
         setOnlineUserIds(prev => new Set([...prev, key]));
+        if (user?.id) chatService.markMessagesDelivered(user.id);
       })
       .on('presence', { event: 'leave' }, ({ key }) => {
         setOnlineUserIds(prev => {
@@ -63,6 +70,7 @@ export const PresenceProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             user_id: user.id,
             online_at: new Date().toISOString(),
           });
+          chatService.markMessagesDelivered(user.id);
         }
       });
 

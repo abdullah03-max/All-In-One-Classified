@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Image as ImageIcon, CheckCheck, Wifi, WifiOff, Mic, Trash2, ArrowLeft, Shield, Lock, ChevronDown } from 'lucide-react';
+import { Send, Image as ImageIcon, CheckCheck, Wifi, WifiOff, Mic, Trash2, ArrowLeft, Shield, Lock, ChevronDown, Check, Phone } from 'lucide-react';
 import { Message, Conversation } from '../../types';
 import { chatService } from '../../services/chatService';
 import { Avatar, Spinner } from '../ui';
@@ -12,6 +12,7 @@ import { AudioPlayer } from './AudioPlayer';
 import { supabase } from '../../lib/supabase';
 
 import { usePresence } from '../../contexts/PresenceContext';
+import { useAudioCall } from '../../contexts/AudioCallContext';
 
 interface ChatWindowProps {
   conversation: Conversation;
@@ -22,6 +23,7 @@ interface ChatWindowProps {
 const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, onBack }) => {
   const { user } = useAuth();
   const { isUserOnline } = usePresence();
+  const { initiateCall } = useAudioCall();
   const { markConversationRead } = useUnreadMessages();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -131,8 +133,26 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
       setConnected(payload?.status === 'ok' || true);
     });
 
-    return () => { channel?.unsubscribe(); };
-  }, [conversation.id, user?.id, scrollToBottom]);
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [conversation.id, user, scrollToBottom]);
+
+  // Trigger mark read when user focuses window or tab becomes visible
+  useEffect(() => {
+    const handleFocus = () => {
+      if (user && conversation.id && document.hasFocus() && document.visibilityState === 'visible') {
+        chatService.markMessagesRead(conversation.id, user.id);
+        markConversationReadRef.current(conversation.id);
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
+  }, [user, conversation.id]);
 
   // Auto-scroll to bottom whenever messages array changes
   useEffect(() => {
@@ -255,7 +275,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
     setSending(true);
 
     try {
-      const msg = await chatService.sendMessage(conversation.id, user.id, content);
+      const isOtherOnline = isUserOnline(otherUser?.id, otherUser?.role);
+      const msg = await chatService.sendMessage(conversation.id, user.id, content, isOtherOnline);
       // Track so realtime won't duplicate
       localMessageIds.current.add(msg.id);
       setMessages(prev => {
@@ -372,6 +393,30 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
             <span className="w-2 h-2 rounded-full bg-slate-400" />
             <span>Offline</span>
           </div>
+        )}
+
+        {/* Audio Call Button */}
+        {otherUser && (
+          <button
+            type="button"
+            onClick={() => {
+              const isOtherOnline = isUserOnline(otherUser.id, otherUser.role);
+              if (!isOtherOnline) {
+                toast.error('User is offline');
+                return;
+              }
+              initiateCall({
+                id: otherUser.id,
+                full_name: otherUser.full_name || 'User',
+                avatar_url: otherUser.avatar_url,
+              }, conversation.id);
+            }}
+            className="p-2 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/40 rounded-full transition-colors shrink-0 cursor-pointer flex items-center justify-center ml-1"
+            title="Start Audio Call"
+            aria-label="Start Audio Call"
+          >
+            <Phone size={19} />
+          </button>
         )}
       </div>
 
@@ -563,10 +608,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
                           )}>
                             <span className="text-[10px] text-slate-400">{formatDate(msg.created_at)}</span>
                             {isMine && (
-                              <CheckCheck
-                                size={11}
-                                className={msg.is_read ? 'text-primary-500' : 'text-slate-400'}
-                              />
+                              msg.is_read ? (
+                                <CheckCheck size={14} className="text-blue-500 font-bold shrink-0" title="Seen" />
+                              ) : msg.is_delivered ? (
+                                <CheckCheck size={14} className="text-slate-400 shrink-0" title="Delivered" />
+                              ) : (
+                                <Check size={14} className="text-slate-400 shrink-0" title="Sent" />
+                              )
                             )}
                           </div>
                         )}

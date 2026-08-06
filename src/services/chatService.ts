@@ -40,14 +40,30 @@ export const chatService = {
     return data as unknown as Message[];
   },
 
-  async sendMessage(conversationId: string, senderId: string, content: string): Promise<Message> {
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({ conversation_id: conversationId, sender_id: senderId, content })
-      .select(`*, sender:users!messages_sender_id_fkey(id, full_name, avatar_url, role)`)
-      .single();
-    if (error) throw error;
-    return data as unknown as Message;
+  async sendMessage(conversationId: string, senderId: string, content: string, isRecipientOnline = false): Promise<Message> {
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: senderId,
+          content,
+          is_delivered: isRecipientOnline,
+        })
+        .select(`*, sender:users!messages_sender_id_fkey(id, full_name, avatar_url, role)`)
+        .single();
+      if (error) throw error;
+      return data as unknown as Message;
+    } catch {
+      // Fallback if is_delivered column is absent
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({ conversation_id: conversationId, sender_id: senderId, content })
+        .select(`*, sender:users!messages_sender_id_fkey(id, full_name, avatar_url, role)`)
+        .single();
+      if (error) throw error;
+      return data as unknown as Message;
+    }
   },
 
   async getOrCreateConversation(
@@ -65,12 +81,41 @@ export const chatService = {
     return data as string;
   },
 
+  async markMessagesDelivered(userId: string): Promise<void> {
+    try {
+      const { data: convs } = await supabase
+        .from('conversations')
+        .select('id')
+        .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`);
+
+      if (convs && convs.length > 0) {
+        const convIds = convs.map(c => c.id);
+        await supabase
+          .from('messages')
+          .update({ is_delivered: true })
+          .in('conversation_id', convIds)
+          .neq('sender_id', userId)
+          .eq('is_delivered', false);
+      }
+    } catch {
+      // Silently catch if column does not exist
+    }
+  },
+
   async markMessagesRead(conversationId: string, userId: string): Promise<void> {
-    await supabase
-      .from('messages')
-      .update({ is_read: true })
-      .eq('conversation_id', conversationId)
-      .neq('sender_id', userId);
+    try {
+      await supabase
+        .from('messages')
+        .update({ is_read: true, is_delivered: true })
+        .eq('conversation_id', conversationId)
+        .neq('sender_id', userId);
+    } catch {
+      await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('conversation_id', conversationId)
+        .neq('sender_id', userId);
+    }
   },
 
   async deleteMessageForMe(messageId: string, userId: string): Promise<void> {
