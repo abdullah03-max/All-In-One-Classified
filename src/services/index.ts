@@ -419,7 +419,7 @@ export const usersService = {
       const { data: resData, error: resError } = await supabase.functions.invoke('send-email', {
         body: {
           to: params.email,
-          subject: `Welcome to All in One Marketplace, ${userName}! 🎉`,
+          subject: `Welcome to All in One Marketplace, ${userName}`,
           text: plainText,
           html: emailBody
         }

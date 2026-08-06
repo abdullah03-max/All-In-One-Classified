@@ -39,16 +39,15 @@ serve(async (req) => {
 
     await transporter.sendMail({
       from: '"All in One Marketplace" <classifiedallinon@gmail.com>',
-      replyTo: '"All in One Marketplace" <classifiedallinon@gmail.com>',
+      replyTo: '"All in One Support" <classifiedallinon@gmail.com>',
       to,
       subject: cleanSubject || subject,
       text: plainText,
       html,
       headers: {
-        'X-Mailer': 'AllInOneMarketplace Notification System',
+        'X-Mailer': 'AllInOne Marketplace System',
         'X-Entity-Ref-ID': `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        'List-Unsubscribe': '<mailto:classifiedallinon@gmail.com?subject=unsubscribe>',
-        'Precedence': 'bulk'
+        'Message-ID': `<welcome-${Date.now()}@allinone-classified.com>`,
       }
     });
 
