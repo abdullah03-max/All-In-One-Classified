@@ -85,28 +85,57 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch {}
   }, []);
 
-  // Synthesize Ringtone Sound using Web Audio API
-  const playRingtone = useCallback(() => {
-    try {
-      unlockAudioContext();
-      const ctx = ringtoneAudioCtxRef.current;
-      if (!ctx) return;
+  const ringtoneIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(440, ctx.currentTime);
-      osc.frequency.setValueAtTime(480, ctx.currentTime + 0.2);
+  // Stop looping ringtone
+  const stopRingtone = useCallback(() => {
+    if (ringtoneIntervalRef.current) {
+      clearInterval(ringtoneIntervalRef.current);
+      ringtoneIntervalRef.current = null;
+    }
+  }, []);
 
-      gain.gain.setValueAtTime(0.15, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+  // Synthesize realistic looping telephone bell sound using Web Audio API
+  const startRingtone = useCallback(() => {
+    stopRingtone();
+    unlockAudioContext();
 
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.8);
-    } catch {}
-  }, [unlockAudioContext]);
+    const playSingleRing = () => {
+      try {
+        const ctx = ringtoneAudioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
+        ringtoneAudioCtxRef.current = ctx;
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const now = ctx.currentTime;
+
+        // Dual Tone PSTN / WhatsApp style Ringtone (440 Hz + 480 Hz)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(440, now);
+        gain1.gain.setValueAtTime(0.25, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 1.8);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(480, now);
+        gain2.gain.setValueAtTime(0.25, now);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now);
+        osc2.stop(now + 1.8);
+      } catch {}
+    };
+
+    playSingleRing();
+    ringtoneIntervalRef.current = setInterval(playSingleRing, 3200);
+  }, [unlockAudioContext, stopRingtone]);
 
   // Play audio stream with retry for browser autoplay policies
   const startRemotePlayback = useCallback(() => {
@@ -116,7 +145,6 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const playPromise = remoteAudioRef.current.play();
       if (playPromise !== undefined) {
         playPromise.catch(() => {
-          // Retry on window interaction if restricted
           const retryOnGesture = () => {
             remoteAudioRef.current?.play().catch(() => {});
             window.removeEventListener('click', retryOnGesture);
@@ -131,6 +159,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Cleanup WebRTC & Streams
   const cleanupCall = useCallback(() => {
+    stopRingtone();
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -252,7 +281,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           setConversationId(payload.conversationId);
           pendingOfferRef.current = payload;
           setCallState('ringing');
-          playRingtone();
+          startRingtone();
 
           // Push Web Notification for mobile / background
           if ('Notification' in window && Notification.permission === 'granted') {
@@ -274,6 +303,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             }
           }
         } else if (payload.type === 'answer') {
+          stopRingtone();
           if (pcRef.current && payload.sdp) {
             await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.sdp));
             await processIceQueue();
@@ -291,6 +321,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             }
           }
         } else if (payload.type === 'rejected') {
+          stopRingtone();
           toast.error('Call declined');
           setCallState('ended');
           setTimeout(() => {
@@ -299,6 +330,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             cleanupCall();
           }, 1200);
         } else if (payload.type === 'ended') {
+          stopRingtone();
           toast('Call ended');
           setCallState('ended');
           setTimeout(() => {
@@ -313,7 +345,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return () => {
       channel.unsubscribe();
     };
-  }, [user?.id, playRingtone, cleanupCall, processIceQueue, startRemotePlayback]);
+  }, [user?.id, startRingtone, stopRingtone, cleanupCall, processIceQueue, startRemotePlayback]);
 
   // Call Duration Timer
   useEffect(() => {
@@ -357,18 +389,19 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         },
       });
 
-      playRingtone();
+      startRingtone();
     } catch (err: any) {
       toast.error('Please allow microphone access to place audio calls');
       setCallState('idle');
       setActiveTargetUser(null);
       cleanupCall();
     }
-  }, [user, getMicrophoneStream, sendSignal, createPeerConnection, playRingtone, cleanupCall, unlockAudioContext]);
+  }, [user, getMicrophoneStream, sendSignal, createPeerConnection, startRingtone, cleanupCall, unlockAudioContext]);
 
   // Accept Incoming Call
   const acceptCall = useCallback(async () => {
     if (!user || !pendingOfferRef.current || !activeTargetUser) return;
+    stopRingtone();
     unlockAudioContext();
     try {
       const stream = await getMicrophoneStream();
@@ -390,7 +423,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       toast.error('Please allow microphone access to answer the call');
       rejectCall();
     }
-  }, [user, activeTargetUser, getMicrophoneStream, sendSignal, createPeerConnection, processIceQueue, startRemotePlayback, unlockAudioContext]);
+  }, [user, activeTargetUser, getMicrophoneStream, sendSignal, createPeerConnection, processIceQueue, startRemotePlayback, unlockAudioContext, stopRingtone]);
 
   // Reject Incoming Call
   const rejectCall = useCallback(() => {
