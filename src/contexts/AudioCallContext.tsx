@@ -49,6 +49,9 @@ const getRtcConfig = (): RTCConfiguration => {
   const envTurnUser = (import.meta as any).env?.VITE_TURN_USERNAME || nodeProc?.env?.NEXT_PUBLIC_TURN_USERNAME || '';
   const envTurnCred = (import.meta as any).env?.VITE_TURN_CREDENTIAL || nodeProc?.env?.NEXT_PUBLIC_TURN_CREDENTIAL || '';
 
+  // Check URL query param ?relay_only=true for TURN relay isolation testing
+  const isRelayOnly = typeof window !== 'undefined' && window.location.search.includes('relay_only=true');
+
   const iceServers: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
@@ -78,10 +81,17 @@ const getRtcConfig = (): RTCConfiguration => {
     });
   }
 
-  return {
+  const config: RTCConfiguration = {
     iceServers,
     iceCandidatePoolSize: 10,
   };
+
+  if (isRelayOnly) {
+    console.warn('[WebRTC Diagnostics] 🧪 RELAY-ONLY TEST MODE ACTIVATED! Forcing iceTransportPolicy = "relay"');
+    config.iceTransportPolicy = 'relay';
+  }
+
+  return config;
 };
 
 export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -332,20 +342,24 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const pc = new RTCPeerConnection(config);
     pcRef.current = pc;
 
+    console.log(`[WebRTC Diagnostics] Initializing Connection -> SignalingState: ${pc.signalingState}, ConnectionState: ${pc.connectionState}, ICEState: ${pc.iceConnectionState}`);
+
     pc.onicegatheringstatechange = () => {
-      console.log('[WebRTC Debug] ICE gathering state changed:', pc.iceGatheringState);
+      console.log('[WebRTC Diagnostics] ICE Gathering State changed:', pc.iceGatheringState);
     };
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        const candidateType = event.candidate.type || 'unknown';
-        console.log(`[WebRTC Debug] Local ICE candidate generated [Type: ${candidateType}]:`, event.candidate.candidate);
-        sendSignal(targetUserId, 'ice-candidate', { candidate: event.candidate });
+        const candidateObj = event.candidate.toJSON ? event.candidate.toJSON() : event.candidate;
+        const candidateType = event.candidate.type || (event.candidate.candidate.includes('typ relay') ? 'relay' : event.candidate.candidate.includes('typ srflx') ? 'srflx' : 'host');
+        const protocol = event.candidate.protocol || (event.candidate.candidate.includes('tcp') ? 'TCP' : 'UDP');
+        console.log(`[WebRTC Diagnostics] 📡 Local Candidate Generated -> Type: [${candidateType.toUpperCase()}] Protocol: ${protocol} Candidate: ${event.candidate.candidate}`);
+        sendSignal(targetUserId, 'ice-candidate', { candidate: candidateObj });
       }
     };
 
     pc.ontrack = (event) => {
-      console.log('[WebRTC Debug] WebRTC ontrack event fired!', event.track.kind, event.track.id, event.streams);
+      console.log('[WebRTC Diagnostics] 🎵 Remote Track Received -> Kind:', event.track.kind, 'ID:', event.track.id, 'Streams:', event.streams?.length);
       let stream: MediaStream;
       if (event.streams && event.streams[0]) {
         stream = event.streams[0];
@@ -362,7 +376,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
 
     pc.onconnectionstatechange = () => {
-      console.log('[WebRTC Debug] PeerConnection connectionState changed:', pc.connectionState);
+      console.log('[WebRTC Diagnostics] ConnectionState changed:', pc.connectionState);
       inspectPeerConnection('connectionstatechange: ' + pc.connectionState);
       if (pc.connectionState === 'connected') {
         setCallState('connected');
@@ -373,18 +387,24 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
 
     pc.oniceconnectionstatechange = () => {
-      console.log('[WebRTC Debug] ICE connection state changed:', pc.iceConnectionState);
+      console.log('[WebRTC Diagnostics] ICE ConnectionState changed:', pc.iceConnectionState);
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
         pc.getStats().then(stats => {
           const statsMap = stats as Map<string, any>;
           stats.forEach(report => {
-            if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+            if (report.type === 'candidate-pair' && (report.selected || report.state === 'succeeded' || report.nominated)) {
               const localCand = statsMap.get(report.localCandidateId);
               const remoteCand = statsMap.get(report.remoteCandidateId);
-              console.log(`[WebRTC Debug] ✅ SELECTED ICE CANDIDATE PAIR -> Local Type: ${localCand?.candidateType} (${localCand?.ip}:${localCand?.port}), Remote Type: ${remoteCand?.candidateType} (${remoteCand?.ip}:${remoteCand?.port})`);
+              console.log(`===================================================================`);
+              console.log(`[WebRTC Diagnostics] ✅ SELECTED ICE CANDIDATE PAIR`);
+              console.log(`Pair State: ${report.state} | Nominated: ${report.nominated}`);
+              console.log(`Local Candidate  -> Type: [${localCand?.candidateType || 'unknown'}] Protocol: ${localCand?.protocol} (${localCand?.ip}:${localCand?.port})`);
+              console.log(`Remote Candidate -> Type: [${remoteCand?.candidateType || 'unknown'}] Protocol: ${remoteCand?.protocol} (${remoteCand?.ip}:${remoteCand?.port})`);
+              console.log(`Traffic Stats    -> Bytes Sent: ${report.bytesSent ?? 0} | Bytes Received: ${report.bytesReceived ?? 0}`);
+              console.log(`===================================================================`);
             }
           });
-        }).catch(e => console.error('[WebRTC Debug] Error inspecting candidate-pair stats:', e));
+        }).catch(e => console.error('[WebRTC Diagnostics] Error inspecting candidate-pair stats:', e));
       }
     };
 
