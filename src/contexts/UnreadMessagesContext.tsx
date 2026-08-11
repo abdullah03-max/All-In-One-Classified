@@ -36,7 +36,7 @@ export const UnreadMessagesProvider: React.FC<{ children: React.ReactNode }> = (
     try {
       await supabase
         .from('messages')
-        .update({ is_read: true, is_delivered: true })
+        .update({ is_read: true })
         .eq('conversation_id', conversationId)
         .neq('sender_id', user.id);
     } catch {}
