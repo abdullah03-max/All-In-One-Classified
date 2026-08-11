@@ -64,7 +64,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, isMine }) => {
   }, [src]);
 
   useEffect(() => {
-    const audio = new Audio(src);
+    const audio = new Audio();
+    audio.crossOrigin = 'anonymous';
+    audio.src = src;
     audioRef.current = audio;
 
     const handleLoadedMetadata = () => {
@@ -83,6 +85,10 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, isMine }) => {
       audio.currentTime = 0;
     };
 
+    const handleError = (e: any) => {
+      console.error('[Voice Message Debug] Audio element playback error:', e, audio.error, 'src:', src);
+    };
+
     if (audio.readyState >= 1) {
       handleLoadedMetadata();
     }
@@ -90,6 +96,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, isMine }) => {
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
 
     // Duration workaround for recorders
     audio.addEventListener('loadeddata', () => {
@@ -108,6 +115,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, isMine }) => {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
       audioRef.current = null;
     };
   }, [src]);

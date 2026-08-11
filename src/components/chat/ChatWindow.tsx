@@ -236,24 +236,39 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
     setUploadingProgress(0);
 
     try {
-      const fileExt = blob.type.split('/')[1]?.split(';')[0] || 'webm';
-      const fileName = `voice_${Date.now()}.${fileExt}`;
+      // Standardize audio content type across all mobile and desktop browsers
+      const rawType = blob.type || 'audio/webm';
+      const mimeType = rawType.split(';')[0].trim();
+      let fileExt = 'webm';
+      if (mimeType.includes('mp4') || mimeType.includes('aac')) fileExt = 'mp4';
+      else if (mimeType.includes('ogg')) fileExt = 'ogg';
+      else if (mimeType.includes('mpeg') || mimeType.includes('mp3')) fileExt = 'mp3';
+
+      const fileName = `voice_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
       const filePath = `chat-audios/${conversation.id}/${fileName}`;
 
+      console.log('[Voice Message Debug] Uploading voice message -> Path:', filePath, 'MIME:', mimeType, 'Size:', blob.size);
+
       setUploadingProgress(40);
-      const { error } = await supabase.storage
+      const { error: uploadErr } = await supabase.storage
         .from('listing-images')
         .upload(filePath, blob, {
-          contentType: blob.type,
+          contentType: mimeType,
           cacheControl: '3600',
+          upsert: true,
         });
 
-      if (error) throw error;
+      if (uploadErr) {
+        console.error('[Voice Message Debug] Storage upload error:', uploadErr);
+        throw uploadErr;
+      }
       setUploadingProgress(85);
 
       const { data: { publicUrl } } = supabase.storage
         .from('listing-images')
         .getPublicUrl(filePath);
+
+      console.log('[Voice Message Debug] Voice message public URL:', publicUrl);
 
       const content = `[audio]:${publicUrl}`;
       const msg = await chatService.sendMessage(conversation.id, user.id, content);
@@ -265,7 +280,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
       });
       onMessageSentRef.current?.();
     } catch (err: any) {
-      toast.error('Failed to upload voice message: ' + err.message);
+      console.error('[Voice Message Debug] Failed to send voice message:', err);
+      toast.error('Failed to upload voice message: ' + (err.message || 'Error'));
     } finally {
       setSending(false);
       setUploadingProgress(null);

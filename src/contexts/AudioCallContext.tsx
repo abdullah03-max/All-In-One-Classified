@@ -43,8 +43,13 @@ const AudioCallContext = createContext<AudioCallContextType>({
 
 export const useAudioCall = () => useContext(AudioCallContext);
 
-const RTC_CONFIG: RTCConfiguration = {
-  iceServers: [
+const getRtcConfig = (): RTCConfiguration => {
+  const nodeProc = typeof globalThis !== 'undefined' && (globalThis as any).process ? (globalThis as any).process : undefined;
+  const envTurnUrl = (import.meta as any).env?.VITE_TURN_URL || nodeProc?.env?.NEXT_PUBLIC_TURN_URL || '';
+  const envTurnUser = (import.meta as any).env?.VITE_TURN_USERNAME || nodeProc?.env?.NEXT_PUBLIC_TURN_USERNAME || '';
+  const envTurnCred = (import.meta as any).env?.VITE_TURN_CREDENTIAL || nodeProc?.env?.NEXT_PUBLIC_TURN_CREDENTIAL || '';
+
+  const iceServers: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
@@ -52,7 +57,7 @@ const RTC_CONFIG: RTCConfiguration = {
     { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:global.stun.twilio.com:3478' },
     { urls: 'stun:stun.cloudflare.com:3478' },
-    // TURN Relay Servers for Carrier NAT / Mobile 4G/5G Traversal
+    // Reliable OpenRelay TURN Relay Servers for Mobile 4G/5G Carrier NAT Traversal
     {
       urls: [
         'turn:openrelay.metered.ca:80',
@@ -62,8 +67,21 @@ const RTC_CONFIG: RTCConfiguration = {
       username: 'openrelayproject',
       credential: 'openrelayproject',
     },
-  ],
-  iceCandidatePoolSize: 10,
+  ];
+
+  if (envTurnUrl) {
+    console.log('[WebRTC Debug] Custom TURN Server configured from environment variables:', envTurnUrl);
+    iceServers.push({
+      urls: envTurnUrl.split(','),
+      username: envTurnUser || undefined,
+      credential: envTurnCred || undefined,
+    });
+  }
+
+  return {
+    iceServers,
+    iceCandidatePoolSize: 10,
+  };
 };
 
 export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -310,7 +328,8 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Create Peer Connection with Media Event Listeners
   const createPeerConnection = useCallback((targetUserId: string) => {
     console.log('[WebRTC Debug] Creating RTCPeerConnection for target:', targetUserId);
-    const pc = new RTCPeerConnection(RTC_CONFIG);
+    const config = getRtcConfig();
+    const pc = new RTCPeerConnection(config);
     pcRef.current = pc;
 
     pc.onicegatheringstatechange = () => {
@@ -319,7 +338,8 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log('[WebRTC Debug] Local ICE candidate generated:', event.candidate.candidate);
+        const candidateType = event.candidate.type || 'unknown';
+        console.log(`[WebRTC Debug] Local ICE candidate generated [Type: ${candidateType}]:`, event.candidate.candidate);
         sendSignal(targetUserId, 'ice-candidate', { candidate: event.candidate });
       }
     };
@@ -354,6 +374,18 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     pc.oniceconnectionstatechange = () => {
       console.log('[WebRTC Debug] ICE connection state changed:', pc.iceConnectionState);
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        pc.getStats().then(stats => {
+          const statsMap = stats as Map<string, any>;
+          stats.forEach(report => {
+            if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+              const localCand = statsMap.get(report.localCandidateId);
+              const remoteCand = statsMap.get(report.remoteCandidateId);
+              console.log(`[WebRTC Debug] ✅ SELECTED ICE CANDIDATE PAIR -> Local Type: ${localCand?.candidateType} (${localCand?.ip}:${localCand?.port}), Remote Type: ${remoteCand?.candidateType} (${remoteCand?.ip}:${remoteCand?.port})`);
+            }
+          });
+        }).catch(e => console.error('[WebRTC Debug] Error inspecting candidate-pair stats:', e));
+      }
     };
 
     return pc;
