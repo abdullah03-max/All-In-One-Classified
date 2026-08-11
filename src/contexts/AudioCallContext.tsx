@@ -78,11 +78,11 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<any>(null);
   const ringtoneAudioCtxRef = useRef<AudioContext | null>(null);
   const pendingOfferRef = useRef<any>(null);
   const iceCandidatesQueueRef = useRef<RTCIceCandidateInit[]>([]);
-  const ringtoneIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const ringtoneIntervalRef = useRef<any>(null);
 
   // Unlock browser audio hardware on user gesture
   const unlockAudioContext = useCallback(() => {
@@ -487,8 +487,8 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         conversationId: convId,
         callerUser: {
           id: user.id,
-          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-          avatar_url: user.user_metadata?.avatar_url,
+          full_name: user.full_name || (user as any).user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          avatar_url: user.avatar_url || (user as any).user_metadata?.avatar_url,
         },
       });
 
