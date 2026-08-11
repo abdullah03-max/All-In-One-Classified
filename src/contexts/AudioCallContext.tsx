@@ -51,6 +51,16 @@ const RTC_CONFIG: RTCConfiguration = {
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:global.stun.twilio.com:3478' },
+    // Free OpenRelay TURN Relay Servers for Mobile 4G/5G Carrier NAT Traversal
+    {
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turns:openrelay.metered.ca:443?transport=tcp',
+      ],
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
   ],
   iceCandidatePoolSize: 10,
 };
@@ -72,7 +82,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const ringtoneAudioCtxRef = useRef<AudioContext | null>(null);
   const pendingOfferRef = useRef<any>(null);
   const iceCandidatesQueueRef = useRef<RTCIceCandidateInit[]>([]);
-  const signalingChannelRef = useRef<any>(null);
+  const ringtoneIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Unlock browser audio hardware on user gesture
   const unlockAudioContext = useCallback(() => {
@@ -88,8 +98,6 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.error('[WebRTC Debug] unlockAudioContext error:', e);
     }
   }, []);
-
-  const ringtoneIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Stop looping ringtone
   const stopRingtone = useCallback(() => {
@@ -153,7 +161,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            console.log('[WebRTC Debug] Remote audio playback playing successfully!');
+            console.log('[WebRTC Debug] Remote audio playing loud and clear!');
           })
           .catch((err) => {
             console.warn('[WebRTC Debug] Autoplay blocked, attaching gesture retry:', err);
@@ -184,14 +192,14 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         track.stop();
-        console.log('[WebRTC Debug] Local track stopped:', track.id);
+        console.log('[WebRTC Debug] Stopped local track:', track.id);
       });
       localStreamRef.current = null;
     }
     if (remoteStreamRef.current) {
       remoteStreamRef.current.getTracks().forEach(track => {
         track.stop();
-        console.log('[WebRTC Debug] Remote track stopped:', track.id);
+        console.log('[WebRTC Debug] Stopped remote track:', track.id);
       });
       remoteStreamRef.current = null;
     }
@@ -238,7 +246,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (candidate) {
         try {
           await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-          console.log('[WebRTC Debug] Successfully added queued ICE candidate');
+          console.log('[WebRTC Debug] Added queued ICE candidate');
         } catch (e) {
           console.error('[WebRTC Debug] Error adding queued ICE candidate:', e);
         }
@@ -251,7 +259,6 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!pcRef.current) return;
     const pc = pcRef.current;
     console.log(`--- [WebRTC Debug Inspection: ${label}] ---`);
-    console.log('PeerConnection SignalingState:', pc.signalingState);
     console.log('PeerConnection ConnectionState:', pc.connectionState);
     console.log('PeerConnection ICEConnectionState:', pc.iceConnectionState);
     console.log('Senders:', pc.getSenders().map(s => ({
@@ -266,13 +273,6 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       enabled: r.track?.enabled,
       readyState: r.track?.readyState
     })));
-    console.log('Transceivers:', pc.getTransceivers().map(t => ({
-      mid: t.mid,
-      direction: t.direction,
-      currentDirection: t.currentDirection,
-      senderTrack: t.sender.track?.id,
-      receiverTrack: t.receiver.track?.id
-    })));
     console.log('-------------------------------------------');
   }, []);
 
@@ -281,7 +281,6 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     console.log('[WebRTC Debug] Creating RTCPeerConnection for target:', targetUserId);
     const pc = new RTCPeerConnection(RTC_CONFIG);
     pcRef.current = pc;
-    // NOTE: DO NOT wipe iceCandidatesQueueRef here so incoming ICE candidates before acceptCall are preserved!
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -318,15 +317,11 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     };
 
-    pc.oniceconnectionstatechange = () => {
-      console.log('[WebRTC Debug] ICE connection state changed:', pc.iceConnectionState);
-    };
-
     return pc;
   }, [sendSignal, startRemotePlayback, inspectPeerConnection]);
 
-  // Capture Microphone Audio Stream with High Quality Audio Constraints
-  const getMicrophoneStream = useCallback(async (): Promise<MediaStream> => {
+  // Capture Microphone Audio Stream with Graceful Fallback for Broken Laptop Microphones
+  const getMicrophoneStream = useCallback(async (): Promise<MediaStream | null> => {
     console.log('[WebRTC Debug] Requesting getUserMedia audio stream...');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -337,13 +332,18 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         },
         video: false,
       });
-      console.log('[WebRTC Debug] Local microphone stream obtained:', stream.id, stream.getAudioTracks().map(t => ({ id: t.id, label: t.label, enabled: t.enabled })));
+      console.log('[WebRTC Debug] Local microphone stream obtained:', stream.id);
       return stream;
     } catch (e) {
-      console.warn('[WebRTC Debug] Primary getUserMedia failed, trying basic fallback:', e);
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      console.log('[WebRTC Debug] Fallback microphone stream obtained:', stream.id);
-      return stream;
+      console.warn('[WebRTC Debug] High-quality getUserMedia failed, trying fallback:', e);
+      try {
+        const fallbackStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        console.log('[WebRTC Debug] Fallback microphone stream obtained:', fallbackStream.id);
+        return fallbackStream;
+      } catch (err) {
+        console.warn('[WebRTC Debug] Laptop microphone is unavailable or broken! Operating in recvonly speaker mode:', err);
+        return null; // Return null so speaker playback still functions for incoming audio!
+      }
     }
   }, []);
 
@@ -352,7 +352,6 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!user?.id) return;
 
     const channel = supabase.channel(`call-signaling-${user.id}`);
-    signalingChannelRef.current = channel;
 
     channel
       .on('broadcast', { event: 'call-signal' }, async ({ payload }) => {
@@ -467,11 +466,15 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const pc = createPeerConnection(targetUser.id);
 
-      // Explicitly add local audio tracks to peer connection
-      stream.getAudioTracks().forEach(track => {
-        console.log('[WebRTC Debug] Adding local audio track to Caller PeerConnection:', track.id);
-        pc.addTrack(track, stream);
-      });
+      if (stream && stream.getAudioTracks().length > 0) {
+        stream.getAudioTracks().forEach(track => {
+          console.log('[WebRTC Debug] Adding local audio track to Caller PeerConnection:', track.id);
+          pc.addTrack(track, stream);
+        });
+      } else {
+        console.warn('[WebRTC Debug] No local microphone tracks, adding recvonly transceiver');
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+      }
 
       inspectPeerConnection('Caller tracks added');
 
@@ -492,7 +495,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       startRingtone();
     } catch (err: any) {
       console.error('[WebRTC Debug] initiateCall error:', err);
-      toast.error('Please allow microphone access to place audio calls');
+      toast.error('Could not start call');
       setCallState('idle');
       setActiveTargetUser(null);
       cleanupCall();
@@ -514,11 +517,15 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const pc = createPeerConnection(activeTargetUser.id);
 
-      // Explicitly add Answerer's local microphone tracks BEFORE creating Answer SDP!
-      stream.getAudioTracks().forEach(track => {
-        console.log('[WebRTC Debug] Adding local audio track to Answerer PeerConnection:', track.id);
-        pc.addTrack(track, stream);
-      });
+      if (stream && stream.getAudioTracks().length > 0) {
+        stream.getAudioTracks().forEach(track => {
+          console.log('[WebRTC Debug] Adding local audio track to Answerer PeerConnection:', track.id);
+          pc.addTrack(track, stream);
+        });
+      } else {
+        console.warn('[WebRTC Debug] Answerer microphone unavailable, adding recvonly transceiver so laptop speaker plays audio');
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+      }
 
       console.log('[WebRTC Debug] Answerer setting RemoteDescription (Caller Offer)...');
       await pc.setRemoteDescription(new RTCSessionDescription(pendingOfferRef.current.sdp));
@@ -538,7 +545,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       startRemotePlayback();
     } catch (err: any) {
       console.error('[WebRTC Debug] acceptCall error:', err);
-      toast.error('Please allow microphone access to answer the call');
+      toast.error('Could not answer call');
       rejectCall();
     }
   }, [user, activeTargetUser, getMicrophoneStream, sendSignal, createPeerConnection, processIceQueue, startRemotePlayback, unlockAudioContext, stopRingtone, inspectPeerConnection]);
