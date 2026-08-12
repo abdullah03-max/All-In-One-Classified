@@ -207,67 +207,52 @@ const ListingCard: React.FC<ListingCardProps> = ({
   if (variant === 'list') {
     return (
       <motion.div
-        whileHover={{ y: -2 }}
-        className="bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200/80 dark:border-slate-700/70 overflow-hidden hover:shadow-xl hover:shadow-primary-500/5 dark:hover:shadow-primary-400/5 transition-all duration-300 group"
+        whileHover={{ y: -1 }}
+        className="card overflow-hidden hover:shadow-card-hover transition-shadow"
       >
-        <Link to={`/listings/${listing.id}`} className="flex gap-4 p-3.5">
-          <div className="relative w-36 h-32 shrink-0 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-700/60">
+        <Link to={`/listings/${listing.id}`} className="flex gap-4 p-3">
+          <div className="relative w-32 h-28 shrink-0 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-700">
             {primaryImage ? (
-              <img
-                src={primaryImage}
-                alt={listing.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
+              <img src={primaryImage} alt={listing.title} className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-medium">No image</div>
+              <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">No image</div>
             )}
             {listing.is_featured && (
-              <div className="absolute top-2 left-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 shadow-xs">
-                <Star size={10} className="fill-white" /> Featured
+              <div className="absolute top-1 left-1 bg-accent-500 text-white text-xs px-1.5 py-0.5 rounded-md font-medium flex items-center gap-0.5">
+                <Star size={10} /> Featured
               </div>
             )}
           </div>
-          <div className="flex-1 min-w-0 py-0.5 flex flex-col justify-between">
-            <div>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-base leading-snug line-clamp-2 mb-1 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                    {listing.title}
-                  </h3>
-                  {!isServiceListing && !isJobListing && (
-                    <p className="text-lg font-black text-primary-600 dark:text-primary-400 flex items-center gap-1">
-                      {formatPrice(listing.price, listing.currency)}
-                      {isRentListing && <span className="text-xs font-semibold text-slate-500 dark:text-slate-400"> / month</span>}
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={handleBookmark}
-                  disabled={bookmarkLoading}
-                  className="p-2 rounded-full bg-slate-50 dark:bg-slate-700/80 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors shrink-0 cursor-pointer"
-                  title="Bookmark"
-                >
-                  <Heart size={16} className={cn(bookmarked ? 'fill-red-500 text-red-500' : 'text-slate-400 hover:text-red-400')} />
-                </button>
+          <div className="flex-1 min-w-0 py-1">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="font-medium text-slate-900 dark:text-slate-100 text-sm leading-tight line-clamp-2 mb-1">{listing.title}</h3>
+                {!isServiceListing && !isJobListing && (
+                  <p className="text-lg font-bold text-primary-600 dark:text-primary-400">
+                    {formatPrice(listing.price, listing.currency)}
+                    {isRentListing && <span className="text-xs font-semibold text-slate-500 dark:text-slate-400"> / month</span>}
+                  </p>
+                )}
               </div>
+              <button onClick={handleBookmark} disabled={bookmarkLoading} className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shrink-0">
+                <Heart size={16} className={cn(bookmarked ? 'fill-red-500 text-red-500' : 'text-slate-400')} />
+              </button>
             </div>
-            <div>
-              <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mb-2">
-                <span className="flex items-center gap-1 font-medium"><MapPin size={12} className="text-slate-400" /> {listing.city}</span>
-                <span className="flex items-center gap-1"><Clock size={12} className="text-slate-400" /> {formatDate(listing.created_at)}</span>
-                <span className="flex items-center gap-1 ml-auto"><Eye size={12} className="text-slate-400" /> {listing.views_count}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {!isJobListing && !isServiceListing && !isPropertyListing && !isAnimalsListing && !isAgriLandOrProduceListing && (
-                  <Badge variant={condInfo.variant}>{condInfo.label}</Badge>
-                )}
-                {isAnimalsListing && listing.attributes?.sex && (
-                  <Badge variant="info">{listing.attributes.sex}</Badge>
-                )}
-                {!isServiceListing && !isJobListing && !isPropertyListing && listing.is_negotiable && (
-                  <Badge variant="purple">Negotiable</Badge>
-                )}
-              </div>
+            <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 dark:text-slate-400">
+              <span className="flex items-center gap-1"><MapPin size={11} /> {listing.city}</span>
+              <span className="flex items-center gap-1"><Clock size={11} /> {formatDate(listing.created_at)}</span>
+              <span className="flex items-center gap-1"><Eye size={11} /> {listing.views_count}</span>
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              {!isJobListing && !isServiceListing && !isPropertyListing && !isAnimalsListing && !isAgriLandOrProduceListing && (
+                <Badge variant={condInfo.variant}>{condInfo.label}</Badge>
+              )}
+              {isAnimalsListing && listing.attributes?.sex && (
+                <Badge variant="info">{listing.attributes.sex}</Badge>
+              )}
+              {!isServiceListing && !isJobListing && !isPropertyListing && listing.is_negotiable && (
+                <Badge variant="purple">Negotiable</Badge>
+              )}
             </div>
           </div>
         </Link>
@@ -277,83 +262,78 @@ const ListingCard: React.FC<ListingCardProps> = ({
 
   return (
     <motion.div
-      whileHover={{ y: -4 }}
-      transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200/80 dark:border-slate-700/70 overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-primary-500/10 dark:hover:shadow-primary-400/10 transition-all duration-300 group flex flex-col h-full"
+      whileHover={{ y: -2 }}
+      className="card overflow-hidden hover:shadow-card-hover transition-shadow group"
     >
-      <Link to={`/listings/${listing.id}`} className="flex flex-col h-full">
+      <Link to={`/listings/${listing.id}`}>
         {/* Image */}
-        <div className="relative h-48 overflow-hidden bg-slate-100 dark:bg-slate-700/60 shrink-0">
+        <div className="relative h-44 overflow-hidden bg-slate-100 dark:bg-slate-700">
           {primaryImage ? (
             <img
               src={primaryImage}
               alt={listing.title}
-              className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500 ease-out"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-slate-300 dark:text-slate-600 text-sm font-medium">No image</div>
+            <div className="w-full h-full flex items-center justify-center text-slate-300 dark:text-slate-600 text-sm">No image</div>
           )}
           {listing.is_featured && (
-            <div className="absolute top-2.5 left-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 shadow-md">
-              <Star size={10} className="fill-white" /> Featured
+            <div className="absolute top-2 left-2 bg-accent-500 text-white text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+              <Star size={10} /> Featured
             </div>
           )}
           <button
             onClick={handleBookmark}
             disabled={bookmarkLoading}
-            className="absolute top-2.5 right-2.5 w-8.5 h-8.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-slate-900 transition-colors shadow-md cursor-pointer"
+            className="absolute top-2 right-2 w-8 h-8 bg-white/90 dark:bg-slate-800/90 rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-slate-800 transition-colors shadow-sm"
           >
             <Heart size={15} className={cn(bookmarked ? 'fill-red-500 text-red-500' : 'text-slate-400 hover:text-red-400')} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-4 flex flex-col justify-between flex-1">
-          <div>
-            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm leading-snug line-clamp-2 mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-              {listing.title}
-            </h3>
-            {!isServiceListing && !isJobListing && (
-              <p className="text-lg font-black text-primary-600 dark:text-primary-400 mb-2.5 tracking-tight">
-                {formatPrice(listing.price, listing.currency)}
-                {isRentListing && <span className="text-xs font-semibold text-slate-500 dark:text-slate-400"> / mo</span>}
-                {listing.is_negotiable && <span className="ml-1 text-[11px] font-normal text-slate-400">(Nego)</span>}
-              </p>
-            )}
+        <div className="p-3">
+          <h3 className="font-medium text-slate-900 dark:text-slate-100 text-sm leading-tight line-clamp-2 mb-1 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+            {listing.title}
+          </h3>
+          {!isServiceListing && !isJobListing && (
+            <p className="text-base font-bold text-primary-600 dark:text-primary-400 mb-2">
+              {formatPrice(listing.price, listing.currency)}
+              {isRentListing && <span className="text-xs font-semibold text-slate-500 dark:text-slate-400"> / month</span>}
+              {listing.is_negotiable && <span className="ml-1 text-xs font-normal text-slate-500">(Nego)</span>}
+            </p>
+          )}
+
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span className="flex items-center gap-1"><MapPin size={11} /> {listing.city}</span>
+            <span className="flex items-center gap-1"><Clock size={11} /> {formatDate(listing.created_at)}</span>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-medium pt-2 border-t border-slate-100 dark:border-slate-700/60">
-              <span className="flex items-center gap-1"><MapPin size={11} className="text-slate-400" /> {listing.city}</span>
-              <span className="flex items-center gap-1"><Clock size={11} className="text-slate-400" /> {formatDate(listing.created_at)}</span>
-            </div>
-
-            <div className="flex items-center justify-between mt-2.5">
-              <div className="flex items-center gap-1.5">
-                {!isJobListing && !isServiceListing && !isPropertyListing && !isAnimalsListing && !isAgriLandOrProduceListing && (
-                  <Badge variant={condInfo.variant}>{condInfo.label}</Badge>
-                )}
-                {isAnimalsListing && listing.attributes?.sex && (
-                  <Badge variant="info">{listing.attributes.sex}</Badge>
-                )}
-              </div>
-              {listing.seller?.is_verified && (
-                <span className="flex items-center gap-0.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">
-                  <Shield size={11} className="fill-emerald-500/20" /> Verified
-                </span>
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center gap-2">
+              {!isJobListing && !isServiceListing && !isPropertyListing && !isAnimalsListing && !isAgriLandOrProduceListing && (
+                <Badge variant={condInfo.variant}>{condInfo.label}</Badge>
+              )}
+              {isAnimalsListing && listing.attributes?.sex && (
+                <Badge variant="info">{listing.attributes.sex}</Badge>
               )}
             </div>
-
-            {listing.seller && (
-              <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-700/60">
-                <Avatar src={listing.seller.avatar_url} name={listing.seller.full_name} size="xs" />
-                <span className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">{listing.seller.full_name}</span>
-                <span className="flex items-center gap-0.5 text-[11px] text-slate-400 ml-auto">
-                  <Eye size={11} /> {listing.views_count}
-                </span>
-              </div>
+            {listing.seller?.is_verified && (
+              <span className="flex items-center gap-0.5 text-xs text-blue-600 dark:text-blue-400 font-semibold">
+                <Shield size={11} className="fill-blue-500/10" /> Verified
+              </span>
             )}
           </div>
+
+          {listing.seller && (
+            <div className="flex items-center gap-2 mt-3 pt-2 border-t border-slate-100 dark:border-slate-700">
+              <Avatar src={listing.seller.avatar_url} name={listing.seller.full_name} size="xs" />
+              <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{listing.seller.full_name}</span>
+              <span className="flex items-center gap-0.5 text-xs text-slate-400 ml-auto">
+                <Eye size={11} /> {listing.views_count}
+              </span>
+            </div>
+          )}
         </div>
       </Link>
     </motion.div>
