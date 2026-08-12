@@ -111,7 +111,7 @@ const ChatPage: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const handleSelectConversation = (conv: Conversation) => {
+  const handleSelectConversation = (conv: Conversation, targetMsgId?: string) => {
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
     if (isMobile && !selected) {
       try {
@@ -119,7 +119,11 @@ const ChatPage: React.FC = () => {
       } catch {}
     }
     setSelected(conv);
-    setSearchParams({ conv: conv.id }, { replace: true });
+    const params: Record<string, string> = { conv: conv.id };
+    if (targetMsgId) {
+      params.msg = targetMsgId;
+    }
+    setSearchParams(params, { replace: true });
     // Clear unread locally immediately
     setConversations(prev =>
       prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c)
@@ -188,9 +192,14 @@ const ChatPage: React.FC = () => {
                   return conv.listing.title !== 'All in One System';
                 })();
 
-                const lastMsgText = conv.last_message?.content?.startsWith('[audio]:')
+                let rawMsgContent = conv.last_message?.content || '';
+                if (rawMsgContent.startsWith('[reply:')) {
+                  const cIdx = rawMsgContent.indexOf(']:');
+                  if (cIdx !== -1) rawMsgContent = rawMsgContent.slice(cIdx + 2);
+                }
+                const lastMsgText = rawMsgContent.startsWith('[audio]:')
                   ? '🎤 Voice message'
-                  : conv.last_message?.content;
+                  : rawMsgContent;
 
                 return (
                   <motion.button
@@ -200,7 +209,7 @@ const ChatPage: React.FC = () => {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
                     transition={{ duration: 0.15 }}
-                    onClick={() => handleSelectConversation(conv)}
+                    onClick={() => handleSelectConversation(conv, conv.last_message?.id)}
                     className={cn(
                       'w-full text-left p-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors border-b border-slate-100 dark:border-slate-800/60 cursor-pointer',
                       isSelected && 'bg-primary-50/80 dark:bg-primary-900/20'

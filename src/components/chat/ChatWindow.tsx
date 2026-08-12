@@ -219,12 +219,20 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
     };
   }, [user, conversation.id]);
 
-  // Auto-scroll to bottom whenever messages array changes
+  // Auto-scroll to target message (e.g. voice message preview) or bottom
   useEffect(() => {
-    if (!loading) {
-      scrollToBottom(true);
+    if (!loading && messages.length > 0) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const targetMsgId = urlParams.get('msg');
+      if (targetMsgId) {
+        setTimeout(() => {
+          scrollToOriginalMessage(targetMsgId);
+        }, 180);
+      } else {
+        scrollToBottom(true);
+      }
     }
-  }, [messages, loading, scrollToBottom]);
+  }, [messages, loading, scrollToBottom, scrollToOriginalMessage]);
 
   // Voice recording controls
   const startRecording = async () => {
