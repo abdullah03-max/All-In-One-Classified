@@ -3,18 +3,39 @@ import { Play, Pause } from 'lucide-react';
 import { cn } from '../../utils/helpers';
 
 interface AudioPlayerProps {
+  msgId?: string;
   src: string;
   isMine: boolean;
+  activeVoiceMsgId?: string | null;
+  isPlayingVoice?: boolean;
+  onTogglePlay?: (msgId: string) => void;
+  onVoiceEnded?: (msgId: string) => void;
 }
 
-export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, isMine }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
+export const AudioPlayer: React.FC<AudioPlayerProps> = ({
+  msgId,
+  src,
+  isMine,
+  activeVoiceMsgId,
+  isPlayingVoice,
+  onTogglePlay,
+  onVoiceEnded,
+}) => {
+  const isThisActive = msgId && activeVoiceMsgId === msgId;
+  const isThisPlaying = isThisActive && !!isPlayingVoice;
+
+  const [localIsPlaying, setLocalIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [waveformBars, setWaveformBars] = useState<number[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const waveformRef = useRef<HTMLDivElement | null>(null);
+  const onVoiceEndedRef = useRef(onVoiceEnded);
+
+  useEffect(() => {
+    onVoiceEndedRef.current = onVoiceEnded;
+  }, [onVoiceEnded]);
 
   // Extract real audio waveform data using Web Audio API
   useEffect(() => {
@@ -63,9 +84,11 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, isMine }) => {
     return () => { isCancelled = true; };
   }, [src]);
 
+  // Initialize and preload audio element immediately
   useEffect(() => {
     const audio = new Audio();
     audio.crossOrigin = 'anonymous';
+    audio.preload = 'auto'; // Immediate background preloading
     audio.src = src;
     audioRef.current = audio;
 
@@ -80,9 +103,12 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, isMine }) => {
     };
 
     const handleEnded = () => {
-      setIsPlaying(false);
+      setLocalIsPlaying(false);
       setCurrentTime(0);
       audio.currentTime = 0;
+      if (msgId) {
+        onVoiceEndedRef.current?.(msgId);
+      }
     };
 
     const handleError = (e: any) => {
@@ -98,7 +124,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, isMine }) => {
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('error', handleError);
 
-    // Duration workaround for recorders
+    // Duration workaround for webm recorders
     audio.addEventListener('loadeddata', () => {
       if (audio.duration === Infinity) {
         audio.currentTime = 1e101;
@@ -118,7 +144,28 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, isMine }) => {
       audio.removeEventListener('error', handleError);
       audioRef.current = null;
     };
-  }, [src]);
+  }, [src, msgId]);
+
+  // Sync playback with centralized active state OR standalone local state
+  const effectiveIsPlaying = onTogglePlay ? isThisPlaying : localIsPlaying;
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (effectiveIsPlaying) {
+      audio.play().catch(err => {
+        console.error('[Voice Message Debug] Playback error:', err);
+      });
+    } else {
+      audio.pause();
+      if (onTogglePlay && !isThisActive) {
+        // Reset timestamp if another voice message is playing
+        audio.currentTime = 0;
+        setCurrentTime(0);
+      }
+    }
+  }, [effectiveIsPlaying, isThisActive, onTogglePlay]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -127,15 +174,10 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, isMine }) => {
   }, [playbackRate]);
 
   const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
+    if (msgId && onTogglePlay) {
+      onTogglePlay(msgId);
     } else {
-      audioRef.current.play().catch(err => {
-        console.error('Playback error:', err);
-      });
-      setIsPlaying(true);
+      setLocalIsPlaying(prev => !prev);
     }
   };
 
@@ -185,7 +227,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, isMine }) => {
             : "bg-primary-600 text-white hover:bg-primary-700"
         )}
       >
-        {isPlaying ? (
+        {effectiveIsPlaying ? (
           <Pause size={16} fill="currentColor" />
         ) : (
           <Play size={16} className="ml-0.5" fill="currentColor" />

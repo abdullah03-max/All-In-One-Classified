@@ -92,6 +92,52 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
   const [replyingToMsg, setReplyingToMsg] = useState<Message | null>(null);
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
 
+  // Centralized Voice Message Playback Manager
+  const [activeVoiceMsgId, setActiveVoiceMsgId] = useState<string | null>(null);
+  const [isPlayingVoice, setIsPlayingVoice] = useState(false);
+
+  const handleToggleVoicePlay = useCallback((msgId: string) => {
+    setActiveVoiceMsgId(prevId => {
+      if (prevId === msgId) {
+        setIsPlayingVoice(prevPlaying => !prevPlaying);
+        return msgId;
+      } else {
+        setIsPlayingVoice(true);
+        return msgId;
+      }
+    });
+  }, []);
+
+  const handleVoiceEnded = useCallback((finishedMsgId: string) => {
+    setMessages(currentMessages => {
+      const visible = currentMessages.filter(m => {
+        if (!user) return true;
+        const isDeletedLocally = typeof window !== 'undefined' && localStorage.getItem(`deleted_msg_${user.id}_${m.id}`) === 'true';
+        const isDeletedInDb = Array.isArray(m.deleted_for_users) && m.deleted_for_users.includes(user.id);
+        return !isDeletedLocally && !isDeletedInDb;
+      });
+
+      const currentIndex = visible.findIndex(m => m.id === finishedMsgId);
+      if (currentIndex !== -1 && currentIndex < visible.length - 1) {
+        const nextMsg = visible[currentIndex + 1];
+        const parsed = parseMessageReply(nextMsg.content);
+        const isNextVoice = parsed.cleanContent.startsWith('[audio]:');
+
+        if (isNextVoice) {
+          console.log('[Voice Message Debug] Auto-advancing to next consecutive voice message:', nextMsg.id);
+          setActiveVoiceMsgId(nextMsg.id);
+          setIsPlayingVoice(true);
+          return currentMessages;
+        }
+      }
+
+      console.log('[Voice Message Debug] Reached text message or end of group. Stopping playback.');
+      setActiveVoiceMsgId(null);
+      setIsPlayingVoice(false);
+      return currentMessages;
+    });
+  }, [user]);
+
   // Voice recording states
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -752,7 +798,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
                                 </p>
                               </div>
                             )}
-                            <AudioPlayer src={displayContent.slice(8)} isMine={isMine} />
+                            <AudioPlayer
+                              msgId={msg.id}
+                              src={displayContent.slice(8)}
+                              isMine={isMine}
+                              activeVoiceMsgId={activeVoiceMsgId}
+                              isPlayingVoice={isPlayingVoice}
+                              onTogglePlay={handleToggleVoicePlay}
+                              onVoiceEnded={handleVoiceEnded}
+                            />
                           </div>
                         ) : (
                           <div className={cn(
