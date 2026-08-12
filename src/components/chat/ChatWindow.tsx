@@ -137,6 +137,30 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
     }
   }, []);
 
+  /**
+   * Scroll to specific target message (e.g. quoted reply or voice message preview)
+   */
+  const scrollToOriginalMessage = useCallback((msgId: string) => {
+    if (!msgId) return;
+    const targetElement = document.getElementById(`msg-${msgId}`);
+    if (targetElement) {
+      targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedMsgId(msgId);
+      setTimeout(() => {
+        setHighlightedMsgId(null);
+      }, 2200);
+    } else {
+      setTimeout(() => {
+        const el = document.getElementById(`msg-${msgId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setHighlightedMsgId(msgId);
+          setTimeout(() => setHighlightedMsgId(null), 2200);
+        }
+      }, 180);
+    }
+  }, []);
+
   useEffect(() => {
     setMessages([]); // Clear messages immediately to avoid state leakage from previous conversation
     let channel: ReturnType<typeof chatService.subscribeToMessages>;
