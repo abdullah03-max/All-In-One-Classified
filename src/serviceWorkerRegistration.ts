@@ -5,6 +5,7 @@ export function registerServiceWorker() {
         .register('/sw.js')
         .then((reg) => {
           console.log('[SW] Service Worker registered:', reg.scope);
+          reg.update();
         })
         .catch((err) => {
           console.warn('[SW] Service Worker registration failed:', err);
