@@ -258,9 +258,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
     }
   }, [messages, loading, scrollToBottom, scrollToOriginalMessage]);
 
+  const isRecordingCanceledRef = useRef(false);
+
   // Voice recording controls
   const startRecording = async () => {
     try {
+      isRecordingCanceledRef.current = false;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
       const options = { mimeType: 'audio/webm' };
@@ -273,13 +276,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (!isRecordingCanceledRef.current && event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
 
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(track => track.stop());
+        if (isRecordingCanceledRef.current) {
+          console.log('[Voice Message Debug] Recording was canceled. Discarding audio blob.');
+          audioChunksRef.current = [];
+          return;
+        }
         if (audioChunksRef.current.length === 0) return;
         const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' });
         await sendVoiceMessage(audioBlob);
@@ -299,6 +307,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
 
   const stopAndSendRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
+      isRecordingCanceledRef.current = false;
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
         recordingTimerRef.current = null;
@@ -309,17 +318,22 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
   };
 
   const cancelRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-      }
-      audioChunksRef.current = [];
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setRecordingTime(0);
-      toast.success('Recording canceled');
+    isRecordingCanceledRef.current = true;
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
     }
+    audioChunksRef.current = [];
+    if (mediaRecorderRef.current) {
+      try {
+        if (mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
+        }
+      } catch (e) {}
+    }
+    setIsRecording(false);
+    setRecordingTime(0);
+    toast.success('Recording canceled');
   };
 
   const sendVoiceMessage = async (blob: Blob) => {
@@ -939,15 +953,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
                 </div>
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={cancelRecording}
-                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      cancelRecording();
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
                     title="Cancel Recording"
                   >
                     <Trash2 size={16} />
                   </button>
                   <button
-                    onClick={stopAndSendRecording}
-                    className="px-3.5 py-1 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1 transition-all"
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      stopAndSendRecording();
+                    }}
+                    className="px-3.5 py-1 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1 transition-all cursor-pointer"
                   >
                     <Send size={12} />
                     <span>Send</span>
