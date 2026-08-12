@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Image as ImageIcon, CheckCheck, Wifi, WifiOff, Mic, Trash2, ArrowLeft, Shield, Lock, ChevronDown, Check, Phone } from 'lucide-react';
+import { Send, Image as ImageIcon, CheckCheck, Wifi, WifiOff, Mic, Trash2, ArrowLeft, Shield, Lock, ChevronDown, Check, Phone, Reply, X, CornerDownRight } from 'lucide-react';
 import { Message, Conversation } from '../../types';
 import { chatService } from '../../services/chatService';
 import { Avatar, Spinner } from '../ui';
@@ -13,6 +13,62 @@ import { supabase } from '../../lib/supabase';
 
 import { usePresence } from '../../contexts/PresenceContext';
 import { useAudioCall } from '../../contexts/AudioCallContext';
+
+interface ReplyInfo {
+  replyToId: string;
+  replyToSender: string;
+  replyToText: string;
+}
+
+function parseMessageReply(content: string): { reply: ReplyInfo | null; cleanContent: string } {
+  if (!content || !content.startsWith('[reply:')) {
+    return { reply: null, cleanContent: content || '' };
+  }
+  const closingIdx = content.indexOf(']:');
+  if (closingIdx === -1) {
+    return { reply: null, cleanContent: content };
+  }
+  const metaStr = content.slice(7, closingIdx);
+  const cleanContent = content.slice(closingIdx + 2);
+  const parts = metaStr.split('|');
+  if (parts.length < 3) {
+    return { reply: null, cleanContent: content };
+  }
+  return {
+    reply: {
+      replyToId: parts[0],
+      replyToSender: parts[1],
+      replyToText: parts.slice(2).join('|'),
+    },
+    cleanContent,
+  };
+}
+
+function formatMessageReply(originalMsg: Message, textContent: string): string {
+  const senderName = originalMsg.sender?.full_name || 'User';
+  const parsed = parseMessageReply(originalMsg.content);
+  let preview = parsed.cleanContent;
+
+  if (preview.startsWith('[audio]:')) {
+    preview = '🎤 Voice message';
+  } else if (preview.startsWith('[Image]') || preview.startsWith('http')) {
+    preview = '📷 Photo';
+  } else if (preview.length > 45) {
+    preview = preview.slice(0, 45) + '...';
+  }
+
+  const safeSender = senderName.replace(/[|\]]/g, ' ');
+  const safePreview = preview.replace(/[|\]]/g, ' ');
+  return `[reply:${originalMsg.id}|${safeSender}|${safePreview}]:${textContent}`;
+}
+
+function getReplyPreviewText(msg: Message): string {
+  const parsed = parseMessageReply(msg.content);
+  let text = parsed.cleanContent;
+  if (text.startsWith('[audio]:')) return '🎤 Voice message';
+  if (text.startsWith('[Image]') || text.startsWith('http')) return '📷 Photo';
+  return text;
+}
 
 interface ChatWindowProps {
   conversation: Conversation;
@@ -31,6 +87,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
   const [sending, setSending] = useState(false);
   const [connected, setConnected] = useState(true);
   const [activeActionMsg, setActiveActionMsg] = useState<Message | null>(null);
+
+  // Reply states
+  const [replyingToMsg, setReplyingToMsg] = useState<Message | null>(null);
+  const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
 
   // Voice recording states
   const [isRecording, setIsRecording] = useState(false);
@@ -270,8 +330,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
 
       console.log('[Voice Message Debug] Voice message public URL:', publicUrl);
 
-      const content = `[audio]:${publicUrl}`;
-      const msg = await chatService.sendMessage(conversation.id, user.id, content);
+      const rawAudioContent = `[audio]:${publicUrl}`;
+      const finalContent = replyingToMsg ? formatMessageReply(replyingToMsg, rawAudioContent) : rawAudioContent;
+      setReplyingToMsg(null);
+
+      const msg = await chatService.sendMessage(conversation.id, user.id, finalContent);
 
       localMessageIds.current.add(msg.id);
       setMessages(prev => {
@@ -291,13 +354,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
 
   const handleSend = async () => {
     if (!input.trim() || !user || sending) return;
-    const content = input.trim();
+    const textContent = input.trim();
+    const finalContent = replyingToMsg ? formatMessageReply(replyingToMsg, textContent) : textContent;
     setInput('');
+    setReplyingToMsg(null);
     setSending(true);
 
     try {
       const isOtherOnline = isUserOnline(otherUser?.id, otherUser?.role);
-      const msg = await chatService.sendMessage(conversation.id, user.id, content, isOtherOnline);
+      const msg = await chatService.sendMessage(conversation.id, user.id, finalContent, isOtherOnline);
       // Track so realtime won't duplicate
       localMessageIds.current.add(msg.id);
       setMessages(prev => {
@@ -307,7 +372,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
       onMessageSentRef.current?.();
     } catch {
       toast.error('Failed to send message');
-      setInput(content);
+      setInput(textContent);
     } finally {
       setSending(false);
       setTimeout(() => inputRef.current?.focus(), 20);
@@ -496,8 +561,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
                 const isGroupStart = !prevMsg || prevMsg.sender_id !== msg.sender_id;
                 const isGroupEnd = !nextMsg || nextMsg.sender_id !== msg.sender_id;
                 const showAvatar = !isMine && isGroupStart;
-                const isVoiceMessage = msg.content.startsWith('[audio]:');
-
                 const isSystem = msg.sender?.role === 'moderator' || msg.sender?.role === 'admin' || msg.sender?.role === 'super_admin';
 
                 if (isSystem) {
@@ -555,15 +618,32 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
                   );
                 }
 
+                const parsedMsg = parseMessageReply(msg.content);
+                const displayContent = parsedMsg.cleanContent;
+                const isVoiceMessage = displayContent.startsWith('[audio]:');
+
                 return (
                   <motion.div
                     key={msg.id}
+                    id={`msg-${msg.id}`}
                     layout
                     initial={{ opacity: 0, y: 6, scale: 0.97 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={{ duration: 0.16, ease: 'easeOut' }}
+                    drag="x"
+                    dragConstraints={{ left: 0, right: 50 }}
+                    dragElastic={0.15}
+                    onDragEnd={(_e, info) => {
+                      if (info.offset.x > 35) {
+                        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                          navigator.vibrate(30);
+                        }
+                        setReplyingToMsg(msg);
+                      }
+                    }}
                     className={cn(
-                      'flex gap-2 group/msg',
+                      'flex gap-2 group/msg relative transition-colors duration-500 rounded-xl p-0.5',
+                      highlightedMsgId === msg.id && 'bg-primary-500/25 ring-2 ring-primary-500/50',
                       isMine ? 'justify-end' : 'justify-start',
                       isGroupEnd ? 'mb-3' : 'mb-0.5'
                     )}
@@ -581,25 +661,56 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
                       'max-w-[75%] flex items-center gap-1',
                       isMine ? 'flex-row' : 'flex-row-reverse'
                     )}>
-                      {/* Delete action button */}
-                      <button
-                        type="button"
-                        onClick={() => setActiveActionMsg(msg)}
-                        className="opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded shrink-0 cursor-pointer"
-                        title="Delete options"
-                      >
-                        <ChevronDown size={14} />
-                      </button>
+                      {/* Action buttons (Delete & Reply) */}
+                      <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={() => setReplyingToMsg(msg)}
+                          className="p-1 text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+                          title="Reply"
+                        >
+                          <Reply size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveActionMsg(msg)}
+                          className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+                          title="Delete options"
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                      </div>
 
                       <div className={cn(
                         'flex flex-col',
                         isMine ? 'items-end' : 'items-start'
                       )}>
                         {isVoiceMessage ? (
-                          <AudioPlayer src={msg.content.slice(8)} isMine={isMine} />
+                          <div className="flex flex-col gap-1">
+                            {/* Quoted Message Card if replying */}
+                            {parsedMsg.reply && (
+                              <div
+                                onClick={() => scrollToOriginalMessage(parsedMsg.reply!.replyToId)}
+                                className={cn(
+                                  'px-2.5 py-1.5 rounded-xl border-l-3 text-xs cursor-pointer transition-colors shadow-xs',
+                                  isMine
+                                    ? 'bg-primary-700/60 border-primary-300 text-white hover:bg-primary-700/80'
+                                    : 'bg-slate-100 dark:bg-slate-800 border-primary-500 text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                )}
+                              >
+                                <div className="font-semibold text-[11px] text-primary-500 dark:text-primary-400">
+                                  {parsedMsg.reply.replyToSender}
+                                </div>
+                                <p className="truncate text-[11px] opacity-80 font-normal">
+                                  {parsedMsg.reply.replyToText}
+                                </p>
+                              </div>
+                            )}
+                            <AudioPlayer src={displayContent.slice(8)} isMine={isMine} />
+                          </div>
                         ) : (
                           <div className={cn(
-                            'px-3.5 py-2 text-sm leading-relaxed break-words',
+                            'px-3.5 py-2 text-sm leading-relaxed break-words shadow-xs',
                             isMine
                               ? [
                                   'bg-primary-600 text-white',
@@ -607,12 +718,34 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
                                   isGroupEnd && 'rounded-b-2xl',
                                ]
                               : [
-                                  'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm',
+                                  'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-xs',
                                   isGroupStart ? 'rounded-t-2xl rounded-r-2xl rounded-bl-sm' : 'rounded-r-2xl rounded-l-sm',
                                   isGroupEnd && 'rounded-b-2xl',
                                ]
                           )}>
-                            {msg.content}
+                            {/* Quoted Message Card inside Bubble */}
+                            {parsedMsg.reply && (
+                              <div
+                                onClick={() => scrollToOriginalMessage(parsedMsg.reply!.replyToId)}
+                                className={cn(
+                                  'mb-1.5 px-2.5 py-1.5 rounded-xl border-l-3 text-xs cursor-pointer transition-all',
+                                  isMine
+                                    ? 'bg-black/15 border-white/70 text-white hover:bg-black/25'
+                                    : 'bg-slate-100 dark:bg-slate-800/80 border-primary-500 text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-750'
+                                )}
+                              >
+                                <div className={cn(
+                                  'font-semibold text-[11px]',
+                                  isMine ? 'text-primary-100' : 'text-primary-600 dark:text-primary-400'
+                                )}>
+                                  {parsedMsg.reply.replyToSender}
+                                </div>
+                                <p className="truncate text-[11px] opacity-90 font-normal mt-0.5">
+                                  {parsedMsg.reply.replyToText}
+                                </p>
+                              </div>
+                            )}
+                            {displayContent}
                           </div>
                         )}
 
@@ -729,6 +862,38 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
         </div>
       ) : (
         <div className="shrink-0 p-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+          
+          {/* Reply Preview Banner (WhatsApp Style) */}
+          <AnimatePresence>
+            {replyingToMsg && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, y: 6 }}
+                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                exit={{ opacity: 0, height: 0, y: 6 }}
+                transition={{ duration: 0.15 }}
+                className="flex items-center justify-between px-3 py-2 bg-slate-100 dark:bg-slate-900 border-l-4 border-primary-500 rounded-r-xl mb-2 shadow-xs"
+              >
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-primary-600 dark:text-primary-400">
+                    <Reply size={12} />
+                    <span>Replying to {replyingToMsg.sender?.full_name || 'User'}</span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 truncate mt-0.5 font-medium">
+                    {getReplyPreviewText(replyingToMsg)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReplyingToMsg(null)}
+                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+                  title="Cancel reply"
+                >
+                  <X size={15} />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 focus-within:border-primary-400 focus-within:ring-1 focus-within:ring-primary-400/30 transition-all px-2.5 py-1">
             
             {isRecording ? (

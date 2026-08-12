@@ -87,6 +87,12 @@ export interface Message {
   is_delivered?: boolean;
   is_deleted?: boolean;
   deleted_for_users?: string[];
+  reply_to_message_id?: string;
+  reply_to_message?: {
+    id: string;
+    sender_name: string;
+    content: string;
+  };
   sender?: User;
 }
 
