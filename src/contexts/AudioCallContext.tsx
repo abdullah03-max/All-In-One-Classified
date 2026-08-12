@@ -251,10 +251,10 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
 
     // Unsubscribe cached signal channels
-    signalChannelsMapRef.current.forEach((ch) => {
-      try { ch.unsubscribe(); } catch {}
+    outgoingSignalQueuesRef.current.forEach((rec) => {
+      try { rec.channel.unsubscribe(); } catch {}
     });
-    signalChannelsMapRef.current.clear();
+    outgoingSignalQueuesRef.current.clear();
 
     setIsMuted(false);
     setIsSpeakerOn(true);
@@ -263,44 +263,72 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     iceCandidatesQueueRef.current = [];
   }, [stopRingtone]);
 
-  // Send Broadcast Signal via Persistent Supabase Channel
-  const sendSignal = useCallback(async (targetUserId: string, type: string, payload: any) => {
-    console.log(`[WebRTC Debug] Sending signal "${type}" to targetUser:`, targetUserId);
-    let channel = signalChannelsMapRef.current.get(targetUserId);
+  const outgoingSignalQueuesRef = useRef<Map<string, { channel: any; isSubscribed: boolean; queue: any[] }>>(new Map());
 
-    if (!channel) {
-      channel = supabase.channel(`call-signaling-${targetUserId}`);
-      signalChannelsMapRef.current.set(targetUserId, channel);
+  // Send Broadcast Signal via Persistent & Queued Supabase Channel
+  const sendSignal = useCallback(async (targetUserId: string, type: string, payload: any) => {
+    console.log(`[WebRTC Diagnostics] Outgoing Signal "${type}" to targetUser:`, targetUserId);
+    const signalData = { type, callerId: user?.id, ...payload };
+
+    let record = outgoingSignalQueuesRef.current.get(targetUserId);
+
+    if (!record) {
+      const channel = supabase.channel(`call-signaling-${targetUserId}`);
+      record = { channel, isSubscribed: false, queue: [signalData] };
+      outgoingSignalQueuesRef.current.set(targetUserId, record);
+
       channel.subscribe((status: string) => {
+        console.log(`[WebRTC Diagnostics] Signal Channel Status for ${targetUserId}:`, status);
         if (status === 'SUBSCRIBED') {
-          channel.send({
-            type: 'broadcast',
-            event: 'call-signal',
-            payload: { type, callerId: user?.id, ...payload },
-          });
+          if (record) {
+            record.isSubscribed = true;
+            // Flush all pending queued candidates / signals
+            console.log(`[WebRTC Diagnostics] Flushing ${record.queue.length} pending signals for ${targetUserId}...`);
+            while (record.queue.length > 0) {
+              const item = record.queue.shift();
+              channel.send({
+                type: 'broadcast',
+                event: 'call-signal',
+                payload: item,
+              });
+            }
+          }
         }
       });
     } else {
-      channel.send({
-        type: 'broadcast',
-        event: 'call-signal',
-        payload: { type, callerId: user?.id, ...payload },
-      });
+      if (record.isSubscribed) {
+        record.channel.send({
+          type: 'broadcast',
+          event: 'call-signal',
+          payload: signalData,
+        });
+      } else {
+        console.log(`[WebRTC Diagnostics] Channel subscribing... Queuing signal "${type}"`);
+        record.queue.push(signalData);
+      }
     }
   }, [user?.id]);
 
   // Process Queued ICE Candidates
   const processIceQueue = useCallback(async () => {
     if (!pcRef.current) return;
-    console.log(`[WebRTC Debug] Processing ${iceCandidatesQueueRef.current.length} queued ICE candidates...`);
-    while (iceCandidatesQueueRef.current.length > 0) {
-      const candidate = iceCandidatesQueueRef.current.shift();
+    const pc = pcRef.current;
+    if (!pc.remoteDescription || !pc.remoteDescription.type) {
+      console.log('[WebRTC Diagnostics] RemoteDescription not ready yet, keeping candidates queued');
+      return;
+    }
+    console.log(`[WebRTC Diagnostics] Processing ${iceCandidatesQueueRef.current.length} queued ICE candidates...`);
+    const queue = [...iceCandidatesQueueRef.current];
+    iceCandidatesQueueRef.current = [];
+
+    for (const candidate of queue) {
       if (candidate) {
         try {
-          await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-          console.log('[WebRTC Debug] Added queued ICE candidate successfully');
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          console.log('[WebRTC Diagnostics] Added queued ICE candidate successfully');
         } catch (e) {
-          console.error('[WebRTC Debug] Error adding queued ICE candidate:', e);
+          console.error('[WebRTC Diagnostics] Error adding queued ICE candidate, re-queuing:', e);
+          iceCandidatesQueueRef.current.push(candidate);
         }
       }
     }
