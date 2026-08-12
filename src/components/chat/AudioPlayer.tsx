@@ -37,15 +37,16 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     onVoiceEndedRef.current = onVoiceEnded;
   }, [onVoiceEnded]);
 
-  // Extract real audio waveform data using Web Audio API
+  // Extract real audio waveform data using Web Audio API safely
   useEffect(() => {
     let isCancelled = false;
 
     const generateWaveform = async () => {
+      let audioCtx: AudioContext | null = null;
       try {
         const response = await fetch(src);
         const arrayBuffer = await response.arrayBuffer();
-        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
         const decodedData = await audioCtx.decodeAudioData(arrayBuffer);
         
         const rawData = decodedData.getChannelData(0);
@@ -68,6 +69,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
         if (!isCancelled) {
           setWaveformBars(normalized);
+          if (decodedData.duration && decodedData.duration > 0) {
+            setDuration(prev => (prev === 0 || prev === Infinity) ? decodedData.duration : prev);
+          }
         }
       } catch (err) {
         // Fallback default waveform if CORS or decode fails
@@ -76,6 +80,10 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             25, 45, 75, 35, 60, 90, 50, 30, 65, 80, 95, 40, 70, 85, 30, 55,
             75, 40, 60, 85, 95, 50, 35, 70, 80, 45, 60, 30, 50, 35, 20, 15
           ]);
+        }
+      } finally {
+        if (audioCtx && audioCtx.state !== 'closed') {
+          try { await audioCtx.close(); } catch {}
         }
       }
     };
@@ -93,13 +101,16 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     audioRef.current = audio;
 
     const handleLoadedMetadata = () => {
-      if (audio.duration !== Infinity && !isNaN(audio.duration)) {
+      if (audio.duration && audio.duration !== Infinity && !isNaN(audio.duration)) {
         setDuration(audio.duration);
       }
     };
 
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
+      if (audio.duration && audio.duration !== Infinity && !isNaN(audio.duration) && duration === 0) {
+        setDuration(audio.duration);
+      }
     };
 
     const handleEnded = () => {
@@ -112,7 +123,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     };
 
     const handleError = (e: any) => {
-      console.error('[Voice Message Debug] Audio element playback error:', e, audio.error, 'src:', src);
+      console.error('[Mobile Voice Debug] Audio element playback error:', e, 'Error Object:', audio.error, 'src:', src);
     };
 
     if (audio.readyState >= 1) {
@@ -120,31 +131,21 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     }
 
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('durationchange', handleLoadedMetadata);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('error', handleError);
 
-    // Duration workaround for webm recorders
-    audio.addEventListener('loadeddata', () => {
-      if (audio.duration === Infinity) {
-        audio.currentTime = 1e101;
-        audio.ontimeupdate = () => {
-          audio.ontimeupdate = null;
-          setDuration(audio.duration);
-          audio.currentTime = 0;
-        };
-      }
-    });
-
     return () => {
       audio.pause();
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('durationchange', handleLoadedMetadata);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('error', handleError);
       audioRef.current = null;
     };
-  }, [src, msgId]);
+  }, [src, msgId, duration]);
 
   // Sync playback with centralized active state OR standalone local state
   const effectiveIsPlaying = onTogglePlay ? isThisPlaying : localIsPlaying;
@@ -154,18 +155,30 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     if (!audio) return;
 
     if (effectiveIsPlaying) {
-      audio.play().catch(err => {
-        console.error('[Voice Message Debug] Playback error:', err);
-      });
+      console.log(`[Mobile Voice Debug] Attempting play -> msgId: ${msgId || 'local'}, src: ${src}, readyState: ${audio.readyState}, currentTime: ${audio.currentTime}`);
+      
+      if (audio.currentTime >= audio.duration && audio.duration > 0) {
+        audio.currentTime = 0;
+      }
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log(`[Mobile Voice Debug] ✅ Play SUCCESS -> msgId: ${msgId || 'local'}`);
+          })
+          .catch(err => {
+            console.error(`[Mobile Voice Debug] ❌ Play FAILED -> msgId: ${msgId || 'local'}, error:`, err, 'audio.error:', audio.error);
+          });
+      }
     } else {
       audio.pause();
       if (onTogglePlay && !isThisActive) {
-        // Reset timestamp if another voice message is playing
         audio.currentTime = 0;
         setCurrentTime(0);
       }
     }
-  }, [effectiveIsPlaying, isThisActive, onTogglePlay]);
+  }, [effectiveIsPlaying, isThisActive, onTogglePlay, msgId, src]);
 
   useEffect(() => {
     if (audioRef.current) {
