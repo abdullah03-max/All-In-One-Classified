@@ -23,6 +23,12 @@ export const AdminCategoriesPage: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<Category | null>(null);
 
+  // View States: 3-Level Drill-Down vs Tree View
+  const [viewMode, setViewMode] = useState<'drilldown' | 'tree'>('drilldown');
+  const [selectedMainCatId, setSelectedMainCatId] = useState<string | null>(null);
+  const [selectedSubCatId, setSelectedSubCatId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Form States
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('Tag');
@@ -43,7 +49,6 @@ export const AdminCategoriesPage: React.FC = () => {
   const [attributesSchema, setAttributesSchema] = useState<any[]>([]);
 
   // Temp single attribute editor state
-  const [newAttrName, setNewAttrName] = useState('');
   const [newAttrLabel, setNewAttrLabel] = useState('');
   const [newAttrType, setNewAttrType] = useState<'text' | 'number' | 'select'>('text');
   const [newAttrOptions, setNewAttrOptions] = useState('');
@@ -108,8 +113,15 @@ export const AdminCategoriesPage: React.FC = () => {
     setLoading(true);
     try {
       const data = await categoriesService.getCategories();
-      setCategories(data || []);
-      checkUnsyncedCategories(data || []);
+      const loadedCats = data || [];
+      setCategories(loadedCats);
+      checkUnsyncedCategories(loadedCats);
+
+      // Auto-select first main category if none selected
+      if (!selectedMainCatId) {
+        const firstMain = loadedCats.find(c => !c.parent_id);
+        if (firstMain) setSelectedMainCatId(firstMain.id);
+      }
     } catch (e: any) {
       toast.error('Failed to load categories: ' + e.message);
     } finally {
@@ -121,44 +133,69 @@ export const AdminCategoriesPage: React.FC = () => {
     fetchCategories();
   }, []);
 
-  const toggleExpanded = (id: string) => {
-    setExpandedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
+  // Map category levels and lineage
+  const categoryLevelMap = React.useMemo(() => {
+    const map = new Map<string, { level: number; path: string; parentId: string | null }>();
+    
+    // Pass 1: Level 1 Main Categories
+    categories.filter(c => !c.parent_id).forEach(main => {
+      map.set(main.id, { level: 1, path: main.name, parentId: null });
     });
-  };
 
-  const handleExpandAll = () => {
-    const ids = new Set<string>();
-    categories.forEach(cat => {
-      ids.add(cat.id);
-      if (cat.subcategories) {
-        cat.subcategories.forEach(sub => {
-          ids.add(sub.id);
+    // Pass 2: Level 2 Sub Categories
+    categories.filter(c => c.parent_id && map.get(c.parent_id)?.level === 1).forEach(sub => {
+      const parentInfo = map.get(sub.parent_id!);
+      map.set(sub.id, { level: 2, path: `${parentInfo?.path} → ${sub.name}`, parentId: sub.parent_id });
+    });
+
+    // Pass 3: Level 3 Sub-Sub Categories
+    categories.filter(c => c.parent_id && map.get(c.parent_id)?.level === 2).forEach(subsub => {
+      const parentInfo = map.get(subsub.parent_id!);
+      map.set(subsub.id, { level: 3, path: `${parentInfo?.path} → ${subsub.name}`, parentId: subsub.parent_id });
+    });
+
+    return map;
+  }, [categories]);
+
+  // Valid Parent Options for Add/Edit Modal
+  const parentOptions = React.useMemo(() => {
+    const options: { value: string; label: string; level: number }[] = [];
+    const mainCats = categories.filter(c => !c.parent_id);
+    
+    // Helper to check if category A is descendant of category B
+    const isDescendant = (candidateId: string, targetId: string): boolean => {
+      let curr = categories.find(c => c.id === candidateId);
+      while (curr && curr.parent_id) {
+        if (curr.parent_id === targetId) return true;
+        curr = categories.find(c => c.id === curr!.parent_id);
+      }
+      return false;
+    };
+
+    mainCats.forEach(main => {
+      // Exclude editing category and its descendants
+      if (main.id !== editingCat?.id && (!editingCat || !isDescendant(main.id, editingCat.id))) {
+        options.push({ value: main.id, label: `📁 Level 1: ${main.name}`, level: 1 });
+        
+        // Subcategories under this main category
+        const subCats = categories.filter(c => c.parent_id === main.id);
+        subCats.forEach(sub => {
+          if (sub.id !== editingCat?.id && (!editingCat || !isDescendant(sub.id, editingCat.id))) {
+            options.push({ value: sub.id, label: `   ↳ Level 2: ${main.name} → ${sub.name}`, level: 2 });
+          }
         });
       }
     });
-    setExpandedIds(ids);
-  };
 
-  const handleCollapseAll = () => {
-    setExpandedIds(new Set());
-  };
+    return options;
+  }, [categories, editingCat]);
 
-  // Hierarchy Resolution helper
+  // Hierarchy Resolution helper for tree view
   const categoryTree = React.useMemo(() => {
     const parents = categories.filter(c => !c.parent_id).map(c => ({ ...c, subcategories: [] as Category[] }));
     const children = categories.filter(c => c.parent_id);
-    
-    // Map parents
     const parentMap = new Map(parents.map(c => [c.id, c]));
     
-    // First pass for second level subcategories
     const orphans: Category[] = [];
     children.forEach(child => {
       const parent = parentMap.get(child.parent_id as string);
@@ -169,7 +206,6 @@ export const AdminCategoriesPage: React.FC = () => {
       }
     });
 
-    // Second pass for third level sub-subcategories
     if (orphans.length > 0) {
       parents.forEach(parent => {
         parent.subcategories.forEach(sub => {
@@ -184,12 +220,58 @@ export const AdminCategoriesPage: React.FC = () => {
     return parents;
   }, [categories]);
 
-  const handleStartAdd = () => {
+  // Category Lists for 3 Columns
+  const mainCategoriesList = React.useMemo(() => {
+    return categories
+      .filter(c => !c.parent_id)
+      .filter(c => !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  }, [categories, searchQuery]);
+
+  const subCategoriesList = React.useMemo(() => {
+    if (!selectedMainCatId) return [];
+    return categories
+      .filter(c => c.parent_id === selectedMainCatId)
+      .filter(c => !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  }, [categories, selectedMainCatId, searchQuery]);
+
+  const subSubCategoriesList = React.useMemo(() => {
+    if (!selectedSubCatId) return [];
+    return categories
+      .filter(c => c.parent_id === selectedSubCatId)
+      .filter(c => !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  }, [categories, selectedSubCatId, searchQuery]);
+
+  // Selected Category Objects
+  const activeMainCat = categories.find(c => c.id === selectedMainCatId);
+  const activeSubCat = categories.find(c => c.id === selectedSubCatId);
+
+  const toggleExpanded = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleExpandAll = () => {
+    const ids = new Set<string>();
+    categories.forEach(cat => ids.add(cat.id));
+    setExpandedIds(ids);
+  };
+
+  const handleCollapseAll = () => setExpandedIds(new Set());
+
+  // Start Adding Category with default parent prefilled
+  const handleStartAdd = (presetParentId: string = '') => {
     setEditingCat(null);
     setName('');
     setIcon('Tag');
     setColor('#3b82f6');
-    setParentId('');
+    setParentId(presetParentId);
     setDescription('');
     setImageUrl('');
     setSortOrder(categories.length + 1);
@@ -240,14 +322,14 @@ export const AdminCategoriesPage: React.FC = () => {
   };
 
   const handleSaveCategory = async () => {
-    if (!name) {
+    if (!name.trim()) {
       toast.error('Category Name is required');
       return;
     }
 
     const payload = {
-      name,
-      slug: slugify(name),
+      name: name.trim(),
+      slug: slugify(name.trim()),
       icon,
       color,
       parent_id: parentId || null,
@@ -279,15 +361,32 @@ export const AdminCategoriesPage: React.FC = () => {
     }
   };
 
-  const handleDeleteCategory = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this category? All nested subcategories will be unlinked.')) return;
+  const handleDeleteCategory = async (cat: Category) => {
+    // Check nested children count
+    const directChildren = categories.filter(c => c.parent_id === cat.id);
+    const directChildIds = directChildren.map(c => c.id);
+    const grandChildren = categories.filter(c => c.parent_id && directChildIds.includes(c.parent_id));
+    const totalNested = directChildren.length + grandChildren.length;
+
+    let confirmMsg = `Are you sure you want to delete category "${cat.name}"?`;
+    if (totalNested > 0) {
+      confirmMsg = `⚠️ WARNING: Category "${cat.name}" has ${directChildren.length} subcategories and ${grandChildren.length} sub-subcategories under it!\n\nDeleting it will unlink or delete all ${totalNested} nested categories. Are you sure you want to proceed?`;
+    }
+
+    if (!confirm(confirmMsg)) return;
+
     try {
       const { error } = await supabase
         .from('categories')
         .delete()
-        .eq('id', id);
+        .eq('id', cat.id);
       if (error) throw error;
-      toast.success('Category deleted successfully');
+      toast.success(`Category "${cat.name}" deleted successfully`);
+
+      // Reset selection if deleted category was active
+      if (selectedMainCatId === cat.id) setSelectedMainCatId(null);
+      if (selectedSubCatId === cat.id) setSelectedSubCatId(null);
+
       fetchCategories();
     } catch (e: any) {
       toast.error('Failed to delete category: ' + e.message);
@@ -295,25 +394,28 @@ export const AdminCategoriesPage: React.FC = () => {
   };
 
   const handleMoveOrder = async (cat: Category, direction: 'up' | 'down') => {
-    const idx = categories.findIndex(c => c.id === cat.id);
+    // Find peer categories on the same level
+    const peers = categories.filter(c => (c.parent_id || null) === (cat.parent_id || null))
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+    const idx = peers.findIndex(c => c.id === cat.id);
     if (idx === -1) return;
     const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= categories.length) return;
+    if (targetIdx < 0 || targetIdx >= peers.length) return;
 
-    const currentCat = categories[idx];
-    const targetCat = categories[targetIdx];
+    const currentCat = peers[idx];
+    const targetCat = peers[targetIdx];
 
-    const currentOrder = currentCat.sort_order || 0;
-    const targetOrder = targetCat.sort_order || 0;
+    const currentOrder = currentCat.sort_order || idx;
+    const targetOrder = targetCat.sort_order || targetIdx;
 
     try {
-      const updates = [
+      await Promise.all([
         supabase.from('categories').update({ sort_order: targetOrder }).eq('id', currentCat.id),
         supabase.from('categories').update({ sort_order: currentOrder }).eq('id', targetCat.id)
-      ];
-      await Promise.all(updates);
+      ]);
       fetchCategories();
-      toast.success('Re-ordered!');
+      toast.success('Category order updated');
     } catch (e: any) {
       toast.error('Re-order failed: ' + e.message);
     }
@@ -339,7 +441,6 @@ export const AdminCategoriesPage: React.FC = () => {
         .from('category_field_options')
         .select('*')
         .eq('category_id', catId);
-      // Silently ignore table-not-found (PGRST205) — table may not be created yet
       if (error && error.code !== 'PGRST205') throw error;
       setOptionsList(data || []);
     } catch (e: any) {
@@ -414,166 +515,470 @@ export const AdminCategoriesPage: React.FC = () => {
         .eq('id', id);
       if (error) throw error;
       toast.success('Option deleted!');
-      if (selectedBrandOption?.id === id) {
-        setSelectedBrandOption(null);
-      }
-      if (optionsCategory) {
-        fetchCategoryOptions(optionsCategory.id);
-      }
+      if (selectedBrandOption?.id === id) setSelectedBrandOption(null);
+      if (optionsCategory) fetchCategoryOptions(optionsCategory.id);
     } catch (e: any) {
       toast.error('Failed to delete option: ' + e.message);
     }
   };
 
+  // Determine current modal target level info
+  const targetParent = categories.find(c => c.id === parentId);
+  const targetLevel = parentId ? ((categoryLevelMap.get(parentId)?.level || 1) + 1) : 1;
+
   return (
     <DashboardLayout navItems={adminNav} title="Manage Categories">
-      <div>
-        <div className="flex items-center justify-between mb-6">
+      <div className="space-y-6">
+        
+        {/* Header & Controls */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900 text-white p-6 rounded-3xl shadow-xl">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Manage Categories</h1>
-            <p className="text-sm text-slate-500 mt-1">Configure nested categories and custom form fields dynamically.</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-white">3-Level Category Manager</h1>
+              <span className="text-xs bg-primary-500/20 text-primary-400 font-bold px-2.5 py-1 rounded-full border border-primary-500/30">
+                Level 1 → Level 2 → Level 3
+              </span>
+            </div>
+            <p className="text-sm text-slate-400 mt-1">
+              Easily manage Main Categories, Sub Categories, and Sub-Sub Categories.
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={handleExpandAll} className="text-xs px-3 py-1.5 h-auto">
-              Expand All
-            </Button>
-            <Button variant="secondary" onClick={handleCollapseAll} className="text-xs px-3 py-1.5 h-auto">
-              Collapse All
-            </Button>
-            <Button icon={<Plus size={16} />} onClick={handleStartAdd}>
-              Add Category
+
+          {/* View Mode Controls */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="bg-slate-800 p-1 rounded-xl flex items-center border border-slate-700">
+              <button
+                onClick={() => setViewMode('drilldown')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                  viewMode === 'drilldown' ? "bg-primary-600 text-white shadow-md" : "text-slate-400 hover:text-white"
+                )}
+              >
+                3-Column Workflow
+              </button>
+              <button
+                onClick={() => setViewMode('tree')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                  viewMode === 'tree' ? "bg-primary-600 text-white shadow-md" : "text-slate-400 hover:text-white"
+                )}
+              >
+                Tree View
+              </button>
+            </div>
+
+            <Button icon={<Plus size={16} />} onClick={() => handleStartAdd('')} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              Add Main Category
             </Button>
           </div>
         </div>
 
+        {/* Sync Banner */}
         {unsyncedCount > 0 && (
-          <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h3 className="font-semibold text-yellow-800 dark:text-yellow-400">System Categories Unsynced</h3>
               <p className="text-sm text-yellow-600 dark:text-yellow-500 mt-0.5">
-                There are {unsyncedCount} system categories that do not exist in the database. Sync them to make them fully editable and allow option configuration.
+                There are {unsyncedCount} system categories missing in database. Sync them to make them fully editable.
               </p>
             </div>
             <Button
               onClick={handleSyncCategories}
               loading={syncing}
-              className="bg-yellow-600 hover:bg-yellow-700 text-white shrink-0 self-start sm:self-center"
+              className="bg-yellow-600 hover:bg-yellow-700 text-white shrink-0"
             >
-              Sync System Categories
+              Sync Categories
             </Button>
           </div>
         )}
 
+        {/* Search Bar */}
+        <div className="w-full max-w-md">
+          <input
+            type="text"
+            placeholder="Filter categories by name..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="input w-full"
+          />
+        </div>
+
+        {/* LOADING SKELETON */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Skeleton className="h-40 rounded-2xl" />
-            <Skeleton className="h-40 rounded-2xl" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Skeleton className="h-96 rounded-2xl" />
+            <Skeleton className="h-96 rounded-2xl" />
+            <Skeleton className="h-96 rounded-2xl" />
           </div>
-        ) : (
-          <div className="space-y-6">
-            {categoryTree.map(cat => (
-              <motion.div
-                key={cat.id}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="card p-5 border border-slate-200 dark:border-slate-800"
-              >
-                {/* Main Category Row */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                  <div 
-                    className="flex items-center gap-3 cursor-pointer select-none group"
-                    onClick={() => toggleExpanded(cat.id)}
-                  >
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center transition-colors group-hover:bg-slate-100 dark:group-hover:bg-slate-800/40" style={{ backgroundColor: cat.color + '20' }}>
-                      <Icon name={cat.icon || 'Tag'} size={20} style={{ color: cat.color }} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <h3 className="font-bold text-slate-800 dark:text-slate-100 group-hover:text-primary-600 transition-colors">{cat.name}</h3>
-                        {cat.subcategories && cat.subcategories.length > 0 && (
-                          expandedIds.has(cat.id) ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />
-                        )}
+        ) : viewMode === 'drilldown' ? (
+          
+          /* ============================================================ */
+          /* 3-LEVEL DRILL-DOWN COLUMN WORKFLOW (RECOMMENDED)             */
+          /* ============================================================ */
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* COLUMN 1: LEVEL 1 MAIN CATEGORIES */}
+            <div className="card p-4 border border-slate-200 dark:border-slate-800 flex flex-col h-[650px]">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-950 text-primary-600 font-bold text-xs flex items-center justify-center">1</span>
+                  <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">Main Categories</h3>
+                  <span className="text-xs text-slate-400">({mainCategoriesList.length})</span>
+                </div>
+                <button
+                  onClick={() => handleStartAdd('')}
+                  className="text-xs text-primary-600 hover:underline font-bold flex items-center gap-1"
+                >
+                  <Plus size={14} /> Add
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                {mainCategoriesList.map(cat => {
+                  const subCount = categories.filter(c => c.parent_id === cat.id).length;
+                  const isSelected = selectedMainCatId === cat.id;
+
+                  return (
+                    <div
+                      key={cat.id}
+                      onClick={() => {
+                        setSelectedMainCatId(cat.id);
+                        // Auto-select first subcategory
+                        const firstSub = categories.find(c => c.parent_id === cat.id);
+                        setSelectedSubCatId(firstSub ? firstSub.id : null);
+                      }}
+                      className={cn(
+                        "p-3 rounded-2xl border transition-all cursor-pointer select-none group flex items-center justify-between",
+                        isSelected
+                          ? "bg-primary-50 dark:bg-primary-950/40 border-primary-500 shadow-sm"
+                          : "border-slate-100 dark:border-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                      )}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: (cat.color || '#3b82f6') + '20' }}
+                        >
+                          <Icon name={cat.icon || 'Tag'} size={18} style={{ color: cat.color || '#3b82f6' }} />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate group-hover:text-primary-600 transition-colors">
+                            {cat.name}
+                          </h4>
+                          <span className="text-[11px] text-slate-400 font-medium">
+                            {subCount} sub-categories
+                          </span>
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-400">Main Category · Sort: {cat.sort_order || 0} · {cat.subcategories?.length || 0} subcategories</p>
+
+                      <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => handleMoveOrder(cat, 'up')} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md text-slate-400"><ArrowUp size={12} /></button>
+                        <button onClick={() => handleMoveOrder(cat, 'down')} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md text-slate-400"><ArrowDown size={12} /></button>
+                        <button onClick={() => handleStartEdit(cat)} className="p-1 text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-md"><Edit2 size={13} /></button>
+                        <button onClick={() => handleDeleteCategory(cat)} className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-md"><Trash2 size={13} /></button>
+                        <ChevronRight size={16} className={cn("transition-transform ml-1", isSelected ? "text-primary-600 translate-x-0.5" : "text-slate-300 opacity-0 group-hover:opacity-100")} />
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => handleMoveOrder(cat, 'up')} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400"><ArrowUp size={14} /></button>
-                    <button onClick={() => handleMoveOrder(cat, 'down')} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400"><ArrowDown size={14} /></button>
-                    <button onClick={() => handleStartEdit(cat)} className="p-1.5 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/20 rounded-lg"><Edit2 size={14} /></button>
-                    <button onClick={() => handleDeleteCategory(cat.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg"><Trash2 size={14} /></button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* COLUMN 2: LEVEL 2 SUB CATEGORIES */}
+            <div className="card p-4 border border-slate-200 dark:border-slate-800 flex flex-col h-[650px]">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 font-bold text-xs flex items-center justify-center shrink-0">2</span>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm truncate">
+                      {activeMainCat ? `Sub Categories under ${activeMainCat.name}` : 'Sub Categories'}
+                    </h3>
                   </div>
                 </div>
+                {selectedMainCatId && (
+                  <button
+                    onClick={() => handleStartAdd(selectedMainCatId)}
+                    className="text-xs text-primary-600 hover:underline font-bold flex items-center gap-1 shrink-0"
+                  >
+                    <Plus size={14} /> Add Sub
+                  </button>
+                )}
+              </div>
 
-                {/* Subcategories (Second level) */}
-                {expandedIds.has(cat.id) && (
-                  <div className="mt-4 pl-4 border-l-2 border-slate-100 dark:border-slate-800 space-y-4">
-                    {cat.subcategories && cat.subcategories.map(sub => (
-                      <div key={sub.id} className="space-y-3">
-                        <div className="flex items-center justify-between py-1 hover:bg-slate-50 dark:hover:bg-slate-800/40 px-2 rounded-xl transition-colors">
-                          <div 
-                            className="flex items-center gap-2 cursor-pointer select-none group"
-                            onClick={() => toggleExpanded(sub.id)}
-                          >
-                            <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full font-bold">Sub</span>
-                            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 group-hover:text-primary-600 transition-colors">{sub.name}</span>
-                            {sub.subcategories && sub.subcategories.length > 0 && (
-                              expandedIds.has(sub.id) ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronRight size={14} className="text-slate-400" />
-                            )}
-                            {(sub as any).attributes_schema?.length > 0 && (
-                              <Badge variant="success" className="text-[9px] py-0.5">{`${(sub as any).attributes_schema.length} fields`}</Badge>
-                            )}
+              {!selectedMainCatId ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400">
+                  <ChevronLeft size={32} className="mb-2 opacity-40 animate-pulse" />
+                  <p className="text-xs">Select a Main Category on the left to manage its Level-2 Sub Categories.</p>
+                </div>
+              ) : subCategoriesList.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400">
+                  <p className="text-xs font-semibold mb-3">No Sub Categories under "{activeMainCat?.name}" yet.</p>
+                  <Button size="sm" onClick={() => handleStartAdd(selectedMainCatId)} icon={<Plus size={14} />}>
+                    Add First Sub Category
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                  {subCategoriesList.map(sub => {
+                    const subsubCount = categories.filter(c => c.parent_id === sub.id).length;
+                    const isSelected = selectedSubCatId === sub.id;
+                    const fieldsCount = (sub as any).attributes_schema?.length || 0;
+
+                    return (
+                      <div
+                        key={sub.id}
+                        onClick={() => setSelectedSubCatId(sub.id)}
+                        className={cn(
+                          "p-3 rounded-2xl border transition-all cursor-pointer select-none group flex items-center justify-between",
+                          isSelected
+                            ? "bg-indigo-50 dark:bg-indigo-950/40 border-indigo-500 shadow-sm"
+                            : "border-slate-100 dark:border-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                        )}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold px-1.5 py-0.5 rounded">
+                              Level 2
+                            </span>
+                            <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate group-hover:text-indigo-600 transition-colors">
+                              {sub.name}
+                            </h4>
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            <button onClick={() => handleManageOptions(sub)} className="p-1 text-slate-400 hover:text-primary-600 rounded-lg" title="Manage Options"><Settings size={12} /></button>
-                            <button onClick={() => handleStartEdit(sub)} className="p-1 text-slate-400 hover:text-primary-600 rounded-lg"><Edit2 size={12} /></button>
-                            <button onClick={() => handleDeleteCategory(sub.id)} className="p-1 text-slate-400 hover:text-red-500 rounded-lg"><Trash2 size={12} /></button>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[11px] text-slate-400 font-medium">
+                              {subsubCount} sub-subs
+                            </span>
+                            {fieldsCount > 0 && (
+                              <Badge variant="success" className="text-[9px] py-0">{`${fieldsCount} fields`}</Badge>
+                            )}
                           </div>
                         </div>
 
-                        {/* Sub-subcategories (Third level) */}
-                        {expandedIds.has(sub.id) && sub.subcategories && sub.subcategories.length > 0 && (
-                          <div className="pl-6 border-l-2 border-dashed border-slate-100 dark:border-slate-800 space-y-2">
-                            {sub.subcategories.map(subsub => (
-                              <div key={subsub.id} className="flex items-center justify-between py-1 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/20 rounded-lg">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-500 px-1.5 py-0.5 rounded font-medium">Sub-Sub</span>
-                                  <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{subsub.name}</span>
-                                  {(subsub as any).attributes_schema?.length > 0 && (
-                                    <Badge variant="info" className="text-[9px] py-0.5">{`${(subsub as any).attributes_schema.length} fields`}</Badge>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <button onClick={() => handleManageOptions(subsub)} className="p-1 text-slate-400 hover:text-primary-600 rounded-lg" title="Manage Options"><Settings size={10} /></button>
-                                  <button onClick={() => handleStartEdit(subsub)} className="p-1 text-slate-400 hover:text-primary-600 rounded-lg"><Edit2 size={10} /></button>
-                                  <button onClick={() => handleDeleteCategory(subsub.id)} className="p-1 text-slate-400 hover:text-red-500 rounded-lg"><Trash2 size={10} /></button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                          <button onClick={() => handleManageOptions(sub)} className="p-1 text-slate-400 hover:text-primary-600 rounded-md" title="Manage Options"><Settings size={12} /></button>
+                          <button onClick={() => handleStartEdit(sub)} className="p-1 text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-md"><Edit2 size={13} /></button>
+                          <button onClick={() => handleDeleteCategory(sub)} className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-md"><Trash2 size={13} /></button>
+                          <ChevronRight size={16} className={cn("transition-transform ml-1", isSelected ? "text-indigo-600 translate-x-0.5" : "text-slate-300 opacity-0 group-hover:opacity-100")} />
+                        </div>
                       </div>
-                    ))}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* COLUMN 3: LEVEL 3 SUB-SUB CATEGORIES */}
+            <div className="card p-4 border border-slate-200 dark:border-slate-800 flex flex-col h-[650px]">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 font-bold text-xs flex items-center justify-center shrink-0">3</span>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm truncate">
+                      {activeSubCat ? `Sub-Sub Categories under ${activeSubCat.name}` : 'Sub-Sub Categories'}
+                    </h3>
                   </div>
+                </div>
+                {selectedSubCatId && (
+                  <button
+                    onClick={() => handleStartAdd(selectedSubCatId)}
+                    className="text-xs text-emerald-600 hover:underline font-bold flex items-center gap-1 shrink-0"
+                  >
+                    <Plus size={14} /> Add Sub-Sub
+                  </button>
                 )}
-              </motion.div>
-            ))}
+              </div>
+
+              {!selectedSubCatId ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400">
+                  <ChevronLeft size={32} className="mb-2 opacity-40 animate-pulse" />
+                  <p className="text-xs">Select a Level-2 Sub Category in column 2 to manage its Level-3 Sub-Sub Categories.</p>
+                </div>
+              ) : subSubCategoriesList.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400">
+                  <p className="text-xs font-semibold mb-3">No Sub-Sub Categories under "{activeSubCat?.name}" yet.</p>
+                  <Button size="sm" onClick={() => handleStartAdd(selectedSubCatId)} icon={<Plus size={14} />} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                    Add First Sub-Sub Category
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                  {subSubCategoriesList.map(subsub => {
+                    const fieldsCount = (subsub as any).attributes_schema?.length || 0;
+
+                    return (
+                      <div
+                        key={subsub.id}
+                        className="p-3 rounded-2xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all flex items-center justify-between"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold px-1.5 py-0.5 rounded">
+                              Level 3
+                            </span>
+                            <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate">
+                              {subsub.name}
+                            </h4>
+                          </div>
+                          {fieldsCount > 0 && (
+                            <span className="text-[10px] text-slate-400 block mt-1">
+                              {fieldsCount} custom attributes
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => handleManageOptions(subsub)} className="p-1 text-slate-400 hover:text-primary-600 rounded-md" title="Manage Options"><Settings size={12} /></button>
+                          <button onClick={() => handleStartEdit(subsub)} className="p-1 text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-md"><Edit2 size={13} /></button>
+                          <button onClick={() => handleDeleteCategory(subsub)} className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-md"><Trash2 size={13} /></button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+          </div>
+        ) : (
+
+          /* ============================================================ */
+          /* FULL HIERARCHY TREE VIEW (ALTERNATIVE VIEW)                 */
+          /* ============================================================ */
+          <div className="space-y-4">
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="secondary" onClick={handleExpandAll} className="text-xs px-3 py-1.5 h-auto">Expand All</Button>
+              <Button variant="secondary" onClick={handleCollapseAll} className="text-xs px-3 py-1.5 h-auto">Collapse All</Button>
+            </div>
+
+            <div className="space-y-4">
+              {categoryTree.map(cat => (
+                <div key={cat.id} className="card p-4 border border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => toggleExpanded(cat.id)}>
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: (cat.color || '#3b82f6') + '20' }}>
+                        <Icon name={cat.icon || 'Tag'} size={18} style={{ color: cat.color }} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">
+                          {cat.name}
+                          {cat.subcategories && cat.subcategories.length > 0 && (
+                            expandedIds.has(cat.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+                          )}
+                        </h3>
+                        <p className="text-xs text-slate-400">Level 1 Main Category · {cat.subcategories?.length || 0} subcategories</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => handleStartAdd(cat.id)} className="text-xs text-primary-600 font-bold px-2 py-1 hover:bg-primary-50 rounded-lg flex items-center gap-1"><Plus size={12} /> Add Sub</button>
+                      <button onClick={() => handleStartEdit(cat)} className="p-1.5 text-primary-600 hover:bg-primary-50 rounded-lg"><Edit2 size={13} /></button>
+                      <button onClick={() => handleDeleteCategory(cat)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={13} /></button>
+                    </div>
+                  </div>
+
+                  {expandedIds.has(cat.id) && cat.subcategories && (
+                    <div className="mt-3 pl-4 border-l-2 border-slate-100 dark:border-slate-800 space-y-3">
+                      {cat.subcategories.map(sub => (
+                        <div key={sub.id} className="space-y-2">
+                          <div className="flex items-center justify-between py-1 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl">
+                            <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => toggleExpanded(sub.id)}>
+                              <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">Level 2</span>
+                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{sub.name}</span>
+                              {sub.subcategories && sub.subcategories.length > 0 && (
+                                expandedIds.has(sub.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => handleStartAdd(sub.id)} className="text-xs text-emerald-600 font-bold px-2 py-1 hover:bg-emerald-50 rounded-lg flex items-center gap-1"><Plus size={12} /> Add Sub-Sub</button>
+                              <button onClick={() => handleManageOptions(sub)} className="p-1 text-slate-400 hover:text-primary-600"><Settings size={12} /></button>
+                              <button onClick={() => handleStartEdit(sub)} className="p-1 text-slate-400 hover:text-primary-600"><Edit2 size={12} /></button>
+                              <button onClick={() => handleDeleteCategory(sub)} className="p-1 text-slate-400 hover:text-red-500"><Trash2 size={12} /></button>
+                            </div>
+                          </div>
+
+                          {expandedIds.has(sub.id) && sub.subcategories && (
+                            <div className="pl-6 border-l-2 border-dashed border-slate-100 dark:border-slate-800 space-y-1">
+                              {sub.subcategories.map(subsub => (
+                                <div key={subsub.id} className="flex items-center justify-between py-1 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/20 rounded-lg">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">Level 3</span>
+                                    <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{subsub.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <button onClick={() => handleManageOptions(subsub)} className="p-1 text-slate-400 hover:text-primary-600"><Settings size={10} /></button>
+                                    <button onClick={() => handleStartEdit(subsub)} className="p-1 text-slate-400 hover:text-primary-600"><Edit2 size={10} /></button>
+                                    <button onClick={() => handleDeleteCategory(subsub)} className="p-1 text-slate-400 hover:text-red-500"><Trash2 size={10} /></button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Category Editor / Add Modal */}
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editingCat ? 'Edit Category' : 'Add Category'} size="xl">
+      {/* ============================================================ */}
+      {/* ADD / EDIT CATEGORY MODAL                                    */}
+      {/* ============================================================ */}
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editingCat ? `Edit Category: ${editingCat.name}` : `Add New Level ${targetLevel} Category`}
+        size="xl"
+      >
         <div className="p-4 space-y-6">
+
+          {/* Level Info Banner */}
+          <div className="bg-slate-100 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className={cn(
+                "w-7 h-7 rounded-xl font-bold text-xs flex items-center justify-center text-white shadow-sm",
+                targetLevel === 1 ? "bg-primary-600" : targetLevel === 2 ? "bg-indigo-600" : "bg-emerald-600"
+              )}>
+                {targetLevel}
+              </span>
+              <div>
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-100 block">
+                  {targetLevel === 1 ? 'Level 1: Main Category' : targetLevel === 2 ? 'Level 2: Sub Category' : 'Level 3: Sub-Sub Category'}
+                </span>
+                {targetParent && (
+                  <span className="text-[11px] text-slate-500">
+                    Parent: <strong className="text-slate-700 dark:text-slate-300">{categoryLevelMap.get(targetParent.id)?.path || targetParent.name}</strong>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <Badge variant={targetLevel === 1 ? 'primary' : targetLevel === 2 ? 'info' : 'success'}>
+              Level {targetLevel}
+            </Badge>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input label="Category Name *" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Mobile Phones" />
+            <Input
+              label="Category Name *"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. Kids Vehicles"
+            />
+
+            {/* Hierarchical Parent Category Dropdown */}
             <Select
-              label="Parent Category (Optional)"
-              options={categories.filter(c => c.id !== editingCat?.id).map(c => ({ value: c.id, label: `${c.parent_id ? '↳ ' : ''}${c.name}` }))}
+              label="Parent Category"
+              options={[
+                { value: '', label: 'None (Create as Level 1 Main Category)' },
+                ...parentOptions.map(p => ({ value: p.value, label: p.label }))
+              ]}
               value={parentId}
               onChange={e => setParentId(e.target.value)}
-              placeholder="None (Create as Main Category)"
             />
+
             <Input label="Icon (Lucide name)" value={icon} onChange={e => setIcon(e.target.value)} placeholder="Tag" />
             <Input label="Color Theme" value={color} onChange={e => setColor(e.target.value)} type="color" className="h-10 cursor-pointer" />
             <Input label="Illustration/Image URL" value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://unsplash.com/..." />
