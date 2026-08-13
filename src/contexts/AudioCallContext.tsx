@@ -117,7 +117,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const ringtoneIntervalRef = useRef<any>(null);
   const signalChannelsMapRef = useRef<Map<string, any>>(new Map());
 
-  // Unlock browser audio hardware on user gesture
+  // Unlock mobile browser audio hardware and pre-authorize HTMLAudioElement on user gesture
   const unlockAudioContext = useCallback(() => {
     try {
       if (!ringtoneAudioCtxRef.current) {
@@ -126,9 +126,18 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (ringtoneAudioCtxRef.current.state === 'suspended') {
         ringtoneAudioCtxRef.current.resume();
       }
-      console.log('[WebRTC Debug] AudioContext hardware state:', ringtoneAudioCtxRef.current.state);
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.muted = false;
+        const p = remoteAudioRef.current.play();
+        if (p !== undefined) {
+          p.catch(() => {
+            // Safe catch for pre-unlocking empty element on touch/click gesture
+          });
+        }
+      }
+      console.log('[WebRTC Diagnostics] Mobile Audio Hardware & Element unlocked on user gesture!');
     } catch (e) {
-      console.error('[WebRTC Debug] unlockAudioContext error:', e);
+      console.error('[WebRTC Diagnostics] unlockAudioContext error:', e);
     }
   }, []);
 
@@ -185,24 +194,27 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Play audio stream with retry for browser autoplay policies
   const startRemotePlayback = useCallback(() => {
     if (remoteAudioRef.current && remoteStreamRef.current) {
-      console.log('[WebRTC Debug] Attaching remote stream to HTMLAudioElement...');
-      remoteAudioRef.current.srcObject = remoteStreamRef.current;
-      remoteAudioRef.current.muted = false;
-      remoteAudioRef.current.volume = isSpeakerOn ? 1.0 : 0.4;
+      console.log('[WebRTC Diagnostics] Attaching remote stream to HTMLAudioElement...');
+      const audioEl = remoteAudioRef.current;
+      audioEl.srcObject = remoteStreamRef.current;
+      audioEl.muted = false;
+      audioEl.volume = isSpeakerOn ? 1.0 : 0.4;
 
-      const playPromise = remoteAudioRef.current.play();
+      const playPromise = audioEl.play();
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            console.log('[WebRTC Debug] HTMLAudioElement.play() SUCCESS! Remote voice playing loud and clear.');
+            console.log('[WebRTC Diagnostics] ✅ HTMLAudioElement.play() SUCCESS! Remote voice playing loud and clear.');
           })
           .catch((err) => {
-            console.warn('[WebRTC Debug] HTMLAudioElement.play() blocked by browser autoplay policy:', err);
+            console.warn('[WebRTC Diagnostics] HTMLAudioElement.play() blocked by browser autoplay policy:', err);
             const retryOnGesture = () => {
-              if (remoteAudioRef.current) {
+              if (remoteAudioRef.current && remoteStreamRef.current) {
+                remoteAudioRef.current.srcObject = remoteStreamRef.current;
+                remoteAudioRef.current.muted = false;
                 remoteAudioRef.current.play().then(() => {
-                  console.log('[WebRTC Debug] Remote audio play resumed on user touch/click gesture!');
-                }).catch(e => console.error('[WebRTC Debug] Gesture play retry failed:', e));
+                  console.log('[WebRTC Diagnostics] ✅ Remote audio play resumed on user touch/click gesture!');
+                }).catch(e => console.error('[WebRTC Diagnostics] Gesture play retry failed:', e));
               }
               window.removeEventListener('click', retryOnGesture);
               window.removeEventListener('touchstart', retryOnGesture);
@@ -212,7 +224,7 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           });
       }
     } else {
-      console.warn('[WebRTC Debug] startRemotePlayback missing remoteAudioRef or remoteStreamRef', {
+      console.warn('[WebRTC Diagnostics] startRemotePlayback missing remoteAudioRef or remoteStreamRef', {
         hasAudioEl: !!remoteAudioRef.current,
         hasStream: !!remoteStreamRef.current
       });
