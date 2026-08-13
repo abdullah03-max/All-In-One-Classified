@@ -182,6 +182,7 @@ export interface SearchFilters {
   sort_by?: 'created_at' | 'price_asc' | 'price_desc' | 'views';
   furnished?: string;
   sex?: string;
+  gender?: string;
 }
 
 export interface PaginatedResponse<T> {

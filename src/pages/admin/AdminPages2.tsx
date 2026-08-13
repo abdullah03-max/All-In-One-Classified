@@ -8,6 +8,7 @@ import { User, Category } from '../../types';
 import Icon from '../../components/ui/Icon';
 import { adminNav } from './AdminPages';
 import { formatDate, formatPrice, slugify, cn } from '../../utils/helpers';
+import { STANDARD_ATTRIBUTES, getEnabledStandardAttrIds, getCustomAttributesSchema, combineAttributesSchema } from '../../utils/standardAttributes';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
@@ -38,6 +39,9 @@ export const AdminCategoriesPage: React.FC = () => {
   const [imageUrl, setImageUrl] = useState('');
   const [sortOrder, setSortOrder] = useState(0);
 
+  // Standard Attributes Toggles state
+  const [enabledStandardIds, setEnabledStandardIds] = useState<string[]>([]);
+
   // Sync state
   const [unsyncedCount, setUnsyncedCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -45,7 +49,7 @@ export const AdminCategoriesPage: React.FC = () => {
   // Expandable tree state
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  // Attributes builder state
+  // Custom Attributes builder state
   const [attributesSchema, setAttributesSchema] = useState<any[]>([]);
 
   // Temp single attribute editor state
@@ -275,6 +279,7 @@ export const AdminCategoriesPage: React.FC = () => {
     setDescription('');
     setImageUrl('');
     setSortOrder(categories.length + 1);
+    setEnabledStandardIds([]);
     setAttributesSchema([]);
     setModalOpen(true);
   };
@@ -288,8 +293,32 @@ export const AdminCategoriesPage: React.FC = () => {
     setDescription(cat.description || '');
     setImageUrl((cat as any).image_url || '');
     setSortOrder(cat.sort_order || 0);
-    setAttributesSchema((cat as any).attributes_schema || []);
+
+    const schema = (cat as any).attributes_schema || [];
+    const stdIds = getEnabledStandardAttrIds(schema);
+    const custom = getCustomAttributesSchema(schema);
+
+    setEnabledStandardIds(stdIds);
+    setAttributesSchema(custom);
     setModalOpen(true);
+  };
+
+  const handleToggleStandardAttr = (stdId: string) => {
+    setEnabledStandardIds(prev => {
+      let next = [...prev];
+      if (next.includes(stdId)) {
+        next = next.filter(id => id !== stdId);
+      } else {
+        next.push(stdId);
+        // Mutual exclusivity for Condition Full vs Simple
+        if (stdId === 'condition_full') {
+          next = next.filter(id => id !== 'condition_simple');
+        } else if (stdId === 'condition_simple') {
+          next = next.filter(id => id !== 'condition_full');
+        }
+      }
+      return next;
+    });
   };
 
   const handleAddAttribute = () => {
@@ -308,7 +337,8 @@ export const AdminCategoriesPage: React.FC = () => {
       label: newAttrLabel,
       type: newAttrType,
       required: newAttrRequired,
-      options: newAttrType === 'select' ? newAttrOptions.split(',').map(s => s.trim()).filter(Boolean) : undefined
+      options: newAttrType === 'select' ? newAttrOptions.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+      isStandard: false
     };
 
     setAttributesSchema([...attributesSchema, newField]);
@@ -327,6 +357,8 @@ export const AdminCategoriesPage: React.FC = () => {
       return;
     }
 
+    const combinedSchema = combineAttributesSchema(enabledStandardIds, attributesSchema);
+
     const payload = {
       name: name.trim(),
       slug: slugify(name.trim()),
@@ -336,7 +368,7 @@ export const AdminCategoriesPage: React.FC = () => {
       description: description || null,
       image_url: imageUrl || null,
       sort_order: sortOrder,
-      attributes_schema: attributesSchema
+      attributes_schema: combinedSchema
     };
 
     try {
@@ -989,11 +1021,59 @@ export const AdminCategoriesPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Standard Attributes / Feature Toggles Section */}
+          <div className="border-t border-slate-100 dark:border-slate-700 pt-5 space-y-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-slate-800 dark:text-slate-100">Standard Attributes / Enable Features</h3>
+                <span className="text-[10px] bg-primary-100 dark:bg-primary-950 text-primary-600 font-bold px-2 py-0.5 rounded-full">Built-In Toggles</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">Enable reusable standard fields for this category. Enabled attributes automatically show up in user post form & search filters.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {Object.values(STANDARD_ATTRIBUTES).map(stdAttr => {
+                const isChecked = enabledStandardIds.includes(stdAttr.id);
+
+                return (
+                  <div
+                    key={stdAttr.id}
+                    onClick={() => handleToggleStandardAttr(stdAttr.id)}
+                    className={cn(
+                      "p-3 rounded-2xl border transition-all cursor-pointer select-none flex items-start gap-3",
+                      isChecked
+                        ? "bg-primary-500/10 border-primary-500 dark:bg-primary-950/40"
+                        : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => {}}
+                      className="w-4 h-4 rounded text-primary-600 mt-0.5 cursor-pointer"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <strong className="text-xs text-slate-800 dark:text-slate-100 font-bold">{stdAttr.name}</strong>
+                        <span className="text-[9px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold px-1.5 py-0.5 rounded">
+                          {stdAttr.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Options: <span className="font-semibold text-slate-700 dark:text-slate-300">{stdAttr.description}</span>
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Dynamic Attributes Schema Builder Section */}
           <div className="border-t border-slate-100 dark:border-slate-700 pt-5 space-y-4">
             <div>
               <h3 className="font-bold text-slate-800 dark:text-slate-100">Custom Attributes Builder</h3>
-              <p className="text-xs text-slate-500">Configure dynamic inputs that only appear when users post ads under this category.</p>
+              <p className="text-xs text-slate-500">Configure category-specific custom fields (e.g. PTA Status, Storage, Size, Material).</p>
             </div>
 
             {/* List of current attributes */}

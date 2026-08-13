@@ -482,7 +482,9 @@ export const listingsService = {
 
     if (filters.min_price !== undefined) query = query.gte('price', filters.min_price);
     if (filters.max_price !== undefined) query = query.lte('price', filters.max_price);
-    if (filters.condition) query = query.eq('condition', filters.condition);
+    if (filters.condition) {
+      query = query.or(`condition.eq.${filters.condition},attributes->>condition.eq.${filters.condition},attributes->>condition.ilike.%${filters.condition}%`);
+    }
     if (filters.location) {
       query = query.or(`city.ilike.%${filters.location}%,location.ilike.%${filters.location}%`);
     }
@@ -491,7 +493,10 @@ export const listingsService = {
       query = query.or(`attributes->>furnished.ilike.%${filters.furnished}%,attributes->>furnished.eq.${filters.furnished}`);
     }
     if (filters.sex) {
-      query = query.or(`attributes->>sex.ilike.%${filters.sex}%,attributes->>sex.eq.${filters.sex},attributes->>gender.ilike.%${filters.sex}%,attributes->>gender.eq.${filters.sex},title.ilike.%${filters.sex}%,description.ilike.%${filters.sex}%`);
+      query = query.or(`attributes->>sex.ilike.%${filters.sex}%,attributes->>sex.eq.${filters.sex},attributes->>animal_sex.ilike.%${filters.sex}%,title.ilike.%${filters.sex}%,description.ilike.%${filters.sex}%`);
+    }
+    if (filters.gender) {
+      query = query.or(`attributes->>gender.ilike.%${filters.gender}%,attributes->>gender.eq.${filters.gender},attributes->>human_gender.ilike.%${filters.gender}%,title.ilike.%${filters.gender}%,description.ilike.%${filters.gender}%`);
     }
 
     switch (filters.sort_by) {

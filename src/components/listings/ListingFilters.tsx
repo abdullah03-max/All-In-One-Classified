@@ -213,6 +213,78 @@ const ListingFilters: React.FC<ListingFiltersProps> = ({ filters, onChange, onRe
         );
       })()}
 
+      {/* Animal Sex Filter */}
+      {(() => {
+        const activeCat = allCategories.find(c => c.id === filters.category_id);
+        const schema = (activeCat as any)?.attributes_schema || [];
+        const hasAnimalSex = schema.some((a: any) => a.name === 'animal_sex' || a.standardId === 'animal_sex') || 
+          activeCat?.slug?.includes('animals') || 
+          activeCat?.slug?.includes('pets') ||
+          activeCat?.name?.includes('Animal') || 
+          activeCat?.name?.includes('Pet');
+
+        if (!hasAnimalSex) return null;
+
+        return (
+          <Section title="Sex (Animal)">
+            <div className="space-y-2">
+              {['Male', 'Female', 'Pair'].map(val => (
+                <label key={val} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="animal_sex"
+                    value={val.toLowerCase()}
+                    checked={filters.sex === val.toLowerCase()}
+                    onChange={() => handleChange('sex', val.toLowerCase())}
+                    className="accent-primary-600"
+                  />
+                  <span className="text-sm text-slate-700 dark:text-slate-300">{val}</span>
+                </label>
+              ))}
+              {filters.sex && (
+                <button onClick={() => handleChange('sex', undefined)} className="text-xs text-primary-600 hover:underline">Clear</button>
+              )}
+            </div>
+          </Section>
+        );
+      })()}
+
+      {/* Human Gender Filter */}
+      {(() => {
+        const activeCat = allCategories.find(c => c.id === filters.category_id);
+        const schema = (activeCat as any)?.attributes_schema || [];
+        const hasHumanGender = schema.some((a: any) => a.name === 'human_gender' || a.standardId === 'human_gender') || 
+          activeCat?.slug?.includes('jobs') || 
+          activeCat?.slug?.includes('services') ||
+          activeCat?.name === 'Jobs' || 
+          activeCat?.name === 'Services';
+
+        if (!hasHumanGender) return null;
+
+        return (
+          <Section title="Gender">
+            <div className="space-y-2">
+              {['Male', 'Female', 'Other'].map(val => (
+                <label key={val} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="human_gender"
+                    value={val.toLowerCase()}
+                    checked={filters.gender === val.toLowerCase()}
+                    onChange={() => handleChange('gender', val.toLowerCase())}
+                    className="accent-primary-600"
+                  />
+                  <span className="text-sm text-slate-700 dark:text-slate-300">{val}</span>
+                </label>
+              ))}
+              {filters.gender && (
+                <button onClick={() => handleChange('gender', undefined)} className="text-xs text-primary-600 hover:underline">Clear</button>
+              )}
+            </div>
+          </Section>
+        );
+      })()}
+
       {/* Location */}
       <Section title="City">
         <Select
