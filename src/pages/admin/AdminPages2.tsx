@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Edit2, Trash2, Tag, Shield, UserPlus, BarChart2, TrendingUp, Users, Package, DollarSign, ArrowUp, ArrowDown, Settings, Eye, X, EyeOff, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Edit2, Trash2, Tag, Shield, UserPlus, BarChart2, TrendingUp, Users, Package, DollarSign, ArrowUp, ArrowDown, Settings, Eye, X, EyeOff, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Button, Modal, Input, Select, Badge, Skeleton, EmptyState, StatCard } from '../../components/ui';
 import { usersService, analyticsService, categoriesService, VIRTUAL_CATEGORIES } from '../../services';
