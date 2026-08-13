@@ -52,6 +52,9 @@ const getRtcConfig = (): RTCConfiguration => {
   // Check URL query param ?relay_only=true for TURN relay isolation testing
   const isRelayOnly = typeof window !== 'undefined' && window.location.search.includes('relay_only=true');
 
+  const defaultTurnUser = '6dc76375a8c5a83541d57f49';
+  const defaultTurnCred = 'DtPn0f2wyVPKJBmM';
+
   const iceServers: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
@@ -60,15 +63,15 @@ const getRtcConfig = (): RTCConfiguration => {
     { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:global.stun.twilio.com:3478' },
     { urls: 'stun:stun.cloudflare.com:3478' },
-    // Reliable OpenRelay TURN Relay Servers for Mobile 4G/5G Carrier NAT Traversal
+    // Dedicated Production Metered TURN Relay Servers for Mobile 4G/5G Carrier NAT Traversal
     {
       urls: [
-        'turn:openrelay.metered.ca:80',
-        'turn:openrelay.metered.ca:443',
-        'turns:openrelay.metered.ca:443?transport=tcp',
+        'turn:global.relay.metered.ca:80',
+        'turn:global.relay.metered.ca:443',
+        'turns:global.relay.metered.ca:443?transport=tcp',
       ],
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
+      username: envTurnUser || defaultTurnUser,
+      credential: envTurnCred || defaultTurnCred,
     },
   ];
 
