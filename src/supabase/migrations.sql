@@ -1672,6 +1672,7 @@ CREATE OR REPLACE FUNCTION public.mark_messages_read(
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 BEGIN
   IF EXISTS (
@@ -1680,9 +1681,10 @@ BEGIN
     AND (buyer_id = p_user_id OR seller_id = p_user_id)
   ) THEN
     UPDATE public.messages
-    SET is_read = true, is_delivered = true
+    SET is_read = true
     WHERE conversation_id = p_conversation_id
-    AND sender_id != p_user_id;
+    AND sender_id != p_user_id
+    AND is_read = false;
   END IF;
 END;
 $$;
