@@ -72,22 +72,33 @@ const getRtcConfig = (): RTCConfiguration => {
     { urls: 'stun:stun.relay.metered.ca:80' },
     { urls: 'stun:stun.relay.metered.ca:443' },
 
-    // Primary Production Metered TURN Relay Servers (UDP & TCP Transports)
-    { urls: 'turn:global.relay.metered.ca:80', username: turnUser, credential: turnCred },
-    { urls: 'turn:global.relay.metered.ca:443', username: turnUser, credential: turnCred },
-    { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: turnUser, credential: turnCred },
-    { urls: 'turn:global.relay.metered.ca:443?transport=tcp', username: turnUser, credential: turnCred },
-    { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: turnUser, credential: turnCred },
-    { urls: 'turn:relay.metered.ca:80', username: turnUser, credential: turnCred },
-    { urls: 'turn:relay.metered.ca:443', username: turnUser, credential: turnCred },
-    { urls: 'turn:relay.metered.ca:443?transport=tcp', username: turnUser, credential: turnCred },
-    { urls: 'turns:relay.metered.ca:443?transport=tcp', username: turnUser, credential: turnCred },
+    // Production Metered TURN Relay Servers (Explicit credentialType: 'password')
+    { urls: 'turn:global.relay.metered.ca:80', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turn:global.relay.metered.ca:443', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turn:global.relay.metered.ca:443?transport=tcp', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turn:relay.metered.ca:80', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turn:relay.metered.ca:443', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turn:relay.metered.ca:443?transport=tcp', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turns:relay.metered.ca:443?transport=tcp', username: turnUser, credential: turnCred, credentialType: 'password' },
+
+    // Metered Regional Relay Servers (A/B/C/D Nodes)
+    { urls: 'turn:a.relay.metered.ca:80', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turn:a.relay.metered.ca:443', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turn:a.relay.metered.ca:443?transport=tcp', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turn:b.relay.metered.ca:80', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turn:b.relay.metered.ca:443', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turn:c.relay.metered.ca:80', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turn:c.relay.metered.ca:443', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turn:d.relay.metered.ca:80', username: turnUser, credential: turnCred, credentialType: 'password' },
+    { urls: 'turn:d.relay.metered.ca:443', username: turnUser, credential: turnCred, credentialType: 'password' },
 
     // Metered OpenRelay Fallback TURN Servers
-    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject', credentialType: 'password' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject', credentialType: 'password' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject', credentialType: 'password' },
+    { urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject', credentialType: 'password' },
   ];
 
   if (envTurnUrl) {
