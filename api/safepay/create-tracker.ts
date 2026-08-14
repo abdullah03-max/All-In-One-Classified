@@ -27,8 +27,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const pkg = PACKAGES[package_id];
     const amountInPkr = pkg.price;
+    const clientKey = SAFEPAY_MERCHANT_KEY || SAFEPAY_API_KEY || '';
 
-    // 1. Call Safepay Sandbox API /order/v1/init to initialize checkout tracker
+    // 1. Call Safepay Sandbox API /order/v1/init to initialize tracker token
     const safepayHost = SAFEPAY_ENV === 'sandbox'
       ? 'https://sandbox.api.getsafepay.com'
       : 'https://api.getsafepay.com';
@@ -37,10 +38,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-SFPY-API-KEY': SAFEPAY_API_KEY || '',
       },
       body: JSON.stringify({
-        client: SAFEPAY_API_KEY,
+        client: clientKey,
         amount: amountInPkr,
         currency: 'PKR',
         environment: SAFEPAY_ENV,
@@ -49,11 +49,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const safepayData = await safepayResponse.json();
 
-    let trackerToken = safepayData?.data?.token || safepayData?.tracker?.token || safepayData?.token;
+    const trackerToken = safepayData?.data?.token || safepayData?.tracker?.token || safepayData?.token;
 
-    // Fallback tracker generation if API mock mode
     if (!trackerToken) {
-      trackerToken = `track_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      console.error('Safepay order init failed:', safepayData);
+      const errMsg = safepayData?.status?.message || safepayData?.message || safepayData?.error || 'Failed to initialize payment tracker with Safepay API';
+      return res.status(400).json({ error: errMsg, details: safepayData });
     }
 
     // 2. Insert pending payment record in Supabase
@@ -82,10 +83,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // 3. Construct Safepay Hosted Checkout URL with required environment and beacon parameters
+    // 3. Construct Safepay Hosted Checkout URL
     const redirectUrl = `${APP_URL}/payment/status?tracker=${trackerToken}`;
-    const env = SAFEPAY_ENV || 'sandbox';
-    const checkoutUrl = `${safepayHost}/checkout/pay?tracker=${trackerToken}&beacon=${trackerToken}&env=${env}&environment=${env}&source=custom&merchant_key_id=${SAFEPAY_MERCHANT_KEY || ''}&redirect_url=${encodeURIComponent(redirectUrl)}&cancel_url=${encodeURIComponent(redirectUrl)}`;
+    const checkoutUrl = `${safepayHost}/checkout/pay?tracker=${trackerToken}&beacon=${trackerToken}&env=${SAFEPAY_ENV}&environment=${SAFEPAY_ENV}&source=custom&merchant_key_id=${clientKey}&redirect_url=${encodeURIComponent(redirectUrl)}&cancel_url=${encodeURIComponent(redirectUrl)}`;
 
     return res.status(200).json({
       success: true,
