@@ -122,6 +122,25 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
 
+  // Auto-inject Eruda Mobile DevTools console button on screen when debug URL flag is present
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (
+      window.location.search.includes('force_relay=true') ||
+      window.location.search.includes('eruda=true') ||
+      window.location.search.includes('debug=true')
+    )) {
+      if (!(window as any).eruda) {
+        console.log('[WebRTC Debug] Injecting Eruda Mobile DevTools Console on screen...');
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/eruda';
+        script.onload = () => {
+          try { (window as any).eruda?.init(); } catch {}
+        };
+        document.head.appendChild(script);
+      }
+    }
+  }, []);
+
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
