@@ -50,6 +50,9 @@ export interface Listing {
   city: string;
   country: string;
   is_featured: boolean;
+  featured_until?: string;
+  featured_package?: string;
+  badge_type?: string;
   is_negotiable: boolean;
   views_count: number;
   created_at: string;
@@ -159,7 +162,7 @@ export interface Offer {
 
 export interface Payment {
   id: string;
-  listing_id: string;
+  listing_id?: string;
   user_id: string;
   amount: number;
   currency: string;
@@ -167,7 +170,14 @@ export interface Payment {
   status: 'pending' | 'completed' | 'failed' | 'refunded';
   transaction_id?: string;
   receipt_url?: string;
+  package_name?: string;
+  duration_days?: number;
+  notes?: string;
+  verified_by?: string;
   created_at: string;
+  updated_at?: string;
+  user?: User;
+  listing?: Listing;
 }
 
 export interface SearchFilters {

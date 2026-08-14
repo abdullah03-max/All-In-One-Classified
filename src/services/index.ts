@@ -458,7 +458,7 @@ export const paymentsService = {
   async getPayments() {
     const { data, error } = await supabase
       .from('payments')
-      .select(`*, user:users!payments_user_id_fkey(id, full_name, email)`)
+      .select(`*, user:users!payments_user_id_fkey(id, full_name, email), listing:listings(id, title, is_featured, featured_until)`)
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data;
@@ -473,6 +473,37 @@ export const paymentsService = {
   async updatePayment(id: string, updates: Record<string, unknown>) {
     const { error } = await supabase.from('payments').update(updates).eq('id', id);
     if (error) throw error;
+  },
+
+  async approveAndPromote(paymentId: string, adminId: string, status: string = 'completed') {
+    try {
+      const { error } = await supabase.rpc('approve_payment_and_promote', {
+        p_payment_id: paymentId,
+        p_admin_id: adminId,
+        p_status: status,
+      });
+      if (error) throw error;
+    } catch {
+      // Fallback if RPC not yet created in Supabase SQL editor
+      await supabase
+        .from('payments')
+        .update({ status, verified_by: adminId, updated_at: new Date().toISOString() })
+        .eq('id', paymentId);
+      
+      if (status === 'completed') {
+        const { data: p } = await supabase.from('payments').select('listing_id, duration_days, package_name').eq('id', paymentId).single();
+        if (p && p.listing_id) {
+          const days = p.duration_days || 7;
+          const until = new Date();
+          until.setDate(until.getDate() + days);
+          await supabase.from('listings').update({
+            is_featured: true,
+            featured_until: until.toISOString(),
+            featured_package: p.package_name || 'Featured',
+          }).eq('id', p.listing_id);
+        }
+      }
+    }
   },
 };
 

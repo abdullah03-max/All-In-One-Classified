@@ -3,8 +3,9 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   MapPin, Clock, Eye, Share2, Flag, MessageCircle,
-  Phone, Shield, Heart, ChevronRight, Tag, DollarSign, CheckCircle
+  Phone, Shield, Heart, ChevronRight, Tag, DollarSign, CheckCircle, Sparkles
 } from 'lucide-react';
+import { PromoteListingModal } from '../components/listings/PromoteListingModal';
 import { listingsService } from '../services/listingsService';
 import { chatService } from '../services/chatService';
 import { bookmarksService, reportsService, offersService, categoriesService } from '../services';
@@ -38,6 +39,7 @@ const ListingDetailPage: React.FC = () => {
   const [bookmarked, setBookmarked] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [offerOpen, setOfferOpen] = useState(false);
+  const [promoteOpen, setPromoteOpen] = useState(false);
   const [contactLoading, setContactLoading] = useState(false);
   const [offerAmount, setOfferAmount] = useState('');
   const [offerMessage, setOfferMessage] = useState('');
@@ -511,7 +513,24 @@ const ListingDetailPage: React.FC = () => {
               </div>
             </div>
 
-            {!isSeller && (
+            {isSeller ? (
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setPromoteOpen(true)}
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold rounded-xl shadow-md transition-all cursor-pointer text-sm"
+                >
+                  <Sparkles className="w-5 h-5 text-amber-200 animate-pulse" />
+                  <span>Promote / Feature Ad</span>
+                </button>
+                <Link
+                  to={`/listings/${listing.id}/edit`}
+                  className="flex items-center justify-center gap-2 w-full py-2.5 border-2 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm"
+                >
+                  Edit Listing
+                </Link>
+              </div>
+            ) : (
               <div className="space-y-3">
                 <Button
                   className="w-full"
@@ -690,6 +709,18 @@ const ListingDetailPage: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Promote Listing Modal */}
+      {listing && (
+        <PromoteListingModal
+          isOpen={promoteOpen}
+          onClose={() => setPromoteOpen(false)}
+          listing={listing}
+          onSuccess={() => {
+            if (id) listingsService.getListing(id).then(setListing);
+          }}
+        />
+      )}
     </div>
   );
 };

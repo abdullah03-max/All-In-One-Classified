@@ -680,51 +680,155 @@ export const AdminUsersPage: React.FC = () => {
 // PAYMENT VERIFICATION PAGE
 // ============================================================
 export const AdminPaymentsPage: React.FC = () => {
-  const [payments, setPayments] = useState<(Payment & { user?: User })[]>([]);
+  const { user } = useAuth();
+  const [payments, setPayments] = useState<(Payment & { user?: User; listing?: Listing })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [previewReceipt, setPreviewReceipt] = useState<string | null>(null);
+
+  const fetchPayments = async () => {
+    try {
+      const d = await paymentsService.getPayments();
+      setPayments(d as unknown as (Payment & { user?: User; listing?: Listing })[]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    paymentsService.getPayments().then(d => setPayments(d as unknown as (Payment & { user?: User })[])).finally(() => setLoading(false));
+    fetchPayments();
   }, []);
 
   const handleVerify = async (id: string, status: 'completed' | 'failed') => {
-    await paymentsService.updatePayment(id, { status });
-    setPayments(prev => prev.map(p => p.id === id ? { ...p, status } : p));
-    toast.success(status === 'completed' ? 'Payment verified' : 'Payment rejected');
+    try {
+      if (user?.id) {
+        await paymentsService.approveAndPromote(id, user.id, status);
+      } else {
+        await paymentsService.updatePayment(id, { status });
+      }
+      toast.success(status === 'completed' ? '🎉 Payment approved & Featured status activated!' : 'Payment marked as rejected');
+      fetchPayments();
+    } catch (err: any) {
+      toast.error('Failed to update payment: ' + (err.message || 'Error'));
+    }
   };
+
+  const totalRevenue = payments
+    .filter(p => p.status === 'completed')
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
+  const pendingCount = payments.filter(p => p.status === 'pending').length;
 
   return (
     <DashboardLayout navItems={adminNav} title="Payment Verification">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">Payment Verification</h1>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Payment & Promotion Verification</h1>
+            <p className="text-xs text-slate-500">Manage transaction receipts, verify local transfers, and activate featured ad promotions</p>
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="card p-5 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-200 dark:border-emerald-800">
+            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Total Revenue</span>
+            <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+              PKR {totalRevenue.toLocaleString()}
+            </div>
+          </div>
+          <div className="card p-5 bg-gradient-to-br from-amber-500/10 to-orange-500/10 border-amber-200 dark:border-amber-800">
+            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Pending Approvals</span>
+            <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+              {pendingCount}
+            </div>
+          </div>
+          <div className="card p-5 bg-gradient-to-br from-primary-500/10 to-indigo-500/10 border-primary-200 dark:border-primary-800">
+            <span className="text-xs font-semibold text-primary-600 dark:text-primary-400 uppercase tracking-wider">Total Transactions</span>
+            <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+              {payments.length}
+            </div>
+          </div>
+        </div>
+
+        {/* Payments List */}
         {loading ? (
-          <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}</div>
+          <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div>
         ) : payments.length === 0 ? (
-          <EmptyState icon={<DollarSign size={28} />} title="No payments" description="Payment records will appear here" />
+          <EmptyState icon={<DollarSign size={28} />} title="No payments yet" description="Submitted promotion payments will appear here for verification" />
         ) : (
           <div className="space-y-3">
             {payments.map(p => (
-              <div key={p.id} className="card p-4 flex items-center gap-4">
-                <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center shrink-0">
-                  <DollarSign size={18} className="text-primary-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-slate-900 dark:text-slate-100">{formatPrice(p.amount, p.currency)}</p>
-                  <p className="text-xs text-slate-500">{p.user?.full_name} · {p.method} · {formatDate(p.created_at)}</p>
-                  {p.transaction_id && <p className="text-xs text-slate-400">TXN: {p.transaction_id}</p>}
-                </div>
-                <Badge variant={p.status === 'completed' ? 'success' : p.status === 'failed' ? 'error' : 'warning'} className="capitalize">{p.status}</Badge>
-                {p.status === 'pending' && (
-                  <div className="flex gap-2 shrink-0">
-                    <Button size="xs" className="bg-green-600 hover:bg-green-700" onClick={() => handleVerify(p.id, 'completed')}>Verify</Button>
-                    <Button size="xs" variant="danger" onClick={() => handleVerify(p.id, 'failed')}>Reject</Button>
+              <div key={p.id} className="card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-200 dark:border-slate-800">
+                <div className="flex items-start gap-3">
+                  <div className="w-11 h-11 bg-primary-100 dark:bg-primary-900/40 text-primary-600 rounded-2xl flex items-center justify-center shrink-0 mt-0.5">
+                    <DollarSign size={20} />
                   </div>
-                )}
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold text-slate-900 dark:text-slate-100 text-base">
+                        {formatPrice(p.amount, p.currency)}
+                      </span>
+                      {p.package_name && (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                          {p.package_name} ({p.duration_days || 7} Days)
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                      User: <strong>{p.user?.full_name || 'User'}</strong> ({p.user?.email})
+                    </p>
+                    {p.listing && (
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Listing: <Link to={`/listings/${p.listing.id}`} className="text-primary-600 hover:underline font-medium">{p.listing.title}</Link>
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mt-2">
+                      <span>Method: <strong className="text-slate-700 dark:text-slate-300">{p.method}</strong></span>
+                      {p.transaction_id && <span>TRX ID: <strong className="font-mono text-slate-700 dark:text-slate-300">{p.transaction_id}</strong></span>}
+                      <span>Date: {formatDate(p.created_at)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 self-end md:self-center shrink-0">
+                  {p.receipt_url && (
+                    <button
+                      onClick={() => setPreviewReceipt(p.receipt_url || null)}
+                      className="px-3 py-1.5 text-xs font-semibold text-primary-600 dark:text-primary-400 border border-primary-300 dark:border-primary-700 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
+                    >
+                      View Receipt
+                    </button>
+                  )}
+                  <Badge variant={p.status === 'completed' ? 'success' : p.status === 'failed' ? 'error' : 'warning'} className="capitalize">
+                    {p.status}
+                  </Badge>
+                  {p.status === 'pending' && (
+                    <div className="flex gap-2">
+                      <Button size="xs" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold" onClick={() => handleVerify(p.id, 'completed')}>
+                        Approve & Promote
+                      </Button>
+                      <Button size="xs" variant="danger" onClick={() => handleVerify(p.id, 'failed')}>
+                        Reject
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Receipt Modal */}
+      {previewReceipt && (
+        <Modal isOpen={!!previewReceipt} onClose={() => setPreviewReceipt(null)} title="Payment Receipt Screenshot" size="md">
+          <div className="p-2 space-y-4">
+            <img src={previewReceipt} alt="Receipt" className="w-full max-h-[70vh] object-contain rounded-2xl border border-slate-200 dark:border-slate-800" />
+            <div className="flex justify-end">
+              <Button onClick={() => setPreviewReceipt(null)}>Close</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </DashboardLayout>
   );
 };
