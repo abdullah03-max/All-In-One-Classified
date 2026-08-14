@@ -7,7 +7,6 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 import { UnreadMessagesProvider } from './contexts/UnreadMessagesContext';
 import { PresenceProvider } from './contexts/PresenceContext';
-import { AudioCallProvider } from './contexts/AudioCallContext';
 
 // Layout
 import MainLayout from './components/layout/MainLayout';
@@ -129,8 +128,7 @@ const App: React.FC = () => {
       <ThemeProvider>
         <AuthProvider>
           <PresenceProvider>
-            <AudioCallProvider>
-              <UnreadMessagesProvider>
+            <UnreadMessagesProvider>
           <BrowserRouter>
             <ScrollToTop />
             <Toaster
@@ -389,7 +387,6 @@ const App: React.FC = () => {
             </Routes>
           </BrowserRouter>
           </UnreadMessagesProvider>
-          </AudioCallProvider>
           </PresenceProvider>
         </AuthProvider>
       </ThemeProvider>

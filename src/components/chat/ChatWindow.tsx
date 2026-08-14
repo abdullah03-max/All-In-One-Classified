@@ -12,7 +12,6 @@ import { AudioPlayer } from './AudioPlayer';
 import { supabase } from '../../lib/supabase';
 
 import { usePresence } from '../../contexts/PresenceContext';
-import { useAudioCall } from '../../contexts/AudioCallContext';
 
 interface ReplyInfo {
   replyToId: string;
@@ -79,7 +78,6 @@ interface ChatWindowProps {
 const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, onBack }) => {
   const { user } = useAuth();
   const { isUserOnline } = usePresence();
-  const { initiateCall } = useAudioCall();
   const { markConversationRead } = useUnreadMessages();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -571,25 +569,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
             <span className="w-2 h-2 rounded-full bg-slate-400" />
             <span>Offline</span>
           </div>
-        )}
-
-        {/* Audio Call Button */}
-        {otherUser && (
-          <button
-            type="button"
-            onClick={() => {
-              initiateCall({
-                id: otherUser.id,
-                full_name: otherUser.full_name || 'User',
-                avatar_url: otherUser.avatar_url,
-              }, conversation.id);
-            }}
-            className="p-2 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/40 rounded-full transition-colors shrink-0 cursor-pointer flex items-center justify-center ml-1"
-            title="Start Audio Call"
-            aria-label="Start Audio Call"
-          >
-            <Phone size={19} />
-          </button>
         )}
       </div>
 
