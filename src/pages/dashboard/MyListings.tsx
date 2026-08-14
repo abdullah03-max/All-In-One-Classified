@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Eye, Edit2, Trash2, Package, Clock, CheckCircle, AlertOctagon, AlertTriangle } from 'lucide-react';
+import { Plus, Eye, Edit2, Trash2, Package, Clock, CheckCircle, AlertOctagon, AlertTriangle, Sparkles } from 'lucide-react';
+import { PromoteListingModal } from '../../components/listings/PromoteListingModal';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Badge, Button, Skeleton, EmptyState, ConfirmDialog } from '../../components/ui';
 import { useAuth } from '../../contexts/AuthContext';
@@ -41,6 +42,7 @@ export const MyListingsPage: React.FC = () => {
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [filter, setFilter] = useState('all');
+    const [selectedPromoteListing, setSelectedPromoteListing] = useState<Listing | null>(null);
 
     useEffect(() => {
         if (!user) return;
@@ -249,11 +251,20 @@ export const MyListingsPage: React.FC = () => {
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex items-center justify-end gap-1 shrink-0 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100 dark:border-slate-800/60">
+                                <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100 dark:border-slate-800/60">
+                                    <button
+                                        onClick={() => setSelectedPromoteListing(listing)}
+                                        className="px-3 py-1.5 text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                                        title="Promote / Feature this ad"
+                                    >
+                                        <Sparkles size={13} className="text-amber-200 animate-pulse" />
+                                        <span>Promote</span>
+                                    </button>
+
                                     {listing.status === 'active' && (
                                         <button
                                             onClick={() => handleMarkSold(listing.id)}
-                                            className="px-2 py-1.5 text-xs text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors flex items-center gap-1"
+                                            className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors flex items-center gap-1"
                                             title="Mark as sold"
                                         >
                                             <CheckCircle size={16} />
@@ -292,6 +303,19 @@ export const MyListingsPage: React.FC = () => {
                 confirmText="Delete"
                 loading={deleting}
             />
+
+            {selectedPromoteListing && (
+                <PromoteListingModal
+                    isOpen={!!selectedPromoteListing}
+                    onClose={() => setSelectedPromoteListing(null)}
+                    listing={selectedPromoteListing}
+                    onSuccess={() => {
+                        if (user) {
+                            listingsService.getSellerListings(user.id).then(setListings);
+                        }
+                    }}
+                />
+            )}
         </DashboardLayout>
     );
 };
