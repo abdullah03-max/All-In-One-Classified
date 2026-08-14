@@ -82,9 +82,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // 3. Construct Safepay Hosted Checkout URL
+    // 3. Construct Safepay Hosted Checkout URL with required environment and beacon parameters
     const redirectUrl = `${APP_URL}/payment/status?tracker=${trackerToken}`;
-    const checkoutUrl = `${safepayHost}/checkout/pay?tracker=${trackerToken}&source=custom&merchant_key_id=${SAFEPAY_MERCHANT_KEY || ''}&redirect_url=${encodeURIComponent(redirectUrl)}&cancel_url=${encodeURIComponent(redirectUrl)}`;
+    const env = SAFEPAY_ENV || 'sandbox';
+    const checkoutUrl = `${safepayHost}/checkout/pay?tracker=${trackerToken}&beacon=${trackerToken}&env=${env}&environment=${env}&source=custom&merchant_key_id=${SAFEPAY_MERCHANT_KEY || ''}&redirect_url=${encodeURIComponent(redirectUrl)}&cancel_url=${encodeURIComponent(redirectUrl)}`;
 
     return res.status(200).json({
       success: true,
