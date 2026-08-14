@@ -289,7 +289,7 @@ const App: React.FC = () => {
                   </ProtectedRoute>
                 } />
                 <Route path="/admin/payments" element={
-                  <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
+                  <ProtectedRoute allowedRoles={['super_admin']}>
                     <AdminPaymentsPage />
                   </ProtectedRoute>
                 } />

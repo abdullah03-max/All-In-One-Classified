@@ -21,7 +21,6 @@ const adminNav = [
   { label: 'Overview', icon: 'LayoutDashboard', to: '/admin' },
   { label: 'Listings', icon: 'Package', to: '/admin/listings' },
   { label: 'Users', icon: 'Users', to: '/admin/users' },
-  { label: 'Payments', icon: 'CreditCard', to: '/admin/payments' },
   { label: 'Categories', icon: 'Tag', to: '/admin/categories' },
   { label: 'Moderators', icon: 'Shield', to: '/admin/moderators' },
   { label: 'Analytics', icon: 'BarChart2', to: '/admin/analytics' },

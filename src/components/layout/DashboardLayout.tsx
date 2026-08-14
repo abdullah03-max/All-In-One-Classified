@@ -74,7 +74,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, navItems, t
         { label: 'Listings', icon: 'Package', to: '/admin/listings' },
         { label: 'Users', icon: 'Users', to: '/admin/users' },
         { label: 'Verification Applications', icon: 'UserCheck', to: '/admin/verifications' },
-        { label: 'Payments', icon: 'CreditCard', to: '/admin/payments' },
         { label: 'Categories', icon: 'Tag', to: '/admin/categories' },
         { label: 'Moderators', icon: 'Shield', to: '/admin/moderators' },
         { label: 'Analytics', icon: 'BarChart2', to: '/admin/analytics' },
