@@ -19,6 +19,7 @@ import CategoryPage from './pages/CategoryPage';
 import ProfilePage from './pages/ProfilePage';
 import ChatPage from './pages/ChatPage';
 import NotFoundPage from './pages/NotFoundPage';
+import { PaymentResultPage } from './pages/PaymentResultPage';
 
 // Auth Pages
 import { LoginPage, RegisterPage, ForgotPasswordPage, AdminLoginPage, ModeratorLoginPage } from './pages/auth/AuthPages';
@@ -167,6 +168,7 @@ const App: React.FC = () => {
                 <Route path="/listings" element={<ListingsPage />} />
                 <Route path="/listings/:id" element={<ListingDetailPage />} />
                 <Route path="/category/:slug" element={<CategoryPage />} />
+                <Route path="/payment/status" element={<PaymentResultPage />} />
 
                 {/* ============================================================
                     PROTECTED ROUTES

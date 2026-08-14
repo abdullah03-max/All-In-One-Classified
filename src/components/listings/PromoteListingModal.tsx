@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles, Zap, Crown, Check, CreditCard, Building2, Smartphone, ShieldCheck, ArrowRight } from 'lucide-react';
+import { X, Sparkles, Zap, Crown, Check, ShieldCheck, ArrowRight, CreditCard, Lock } from 'lucide-react';
 import { Listing } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { paymentsService } from '../../services';
 import toast from 'react-hot-toast';
 
 interface PromoteListingModalProps {
@@ -65,65 +64,44 @@ export const PromoteListingModal: React.FC<PromoteListingModalProps> = ({
   isOpen,
   onClose,
   listing,
-  onSuccess,
 }) => {
   const { user } = useAuth();
   const [selectedPackage, setSelectedPackage] = useState<PromotionPackage>(PROMOTION_PACKAGES[1]);
-  const [paymentMethod, setPaymentMethod] = useState<'local' | 'card'>('local');
-  const [transactionId, setTransactionId] = useState('');
-  const [receiptUrl, setReceiptUrl] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
   const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSafepayCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
       toast.error('Please log in to promote your listing');
       return;
     }
 
-    if (paymentMethod === 'local' && !transactionId.trim()) {
-      toast.error('Please enter your Transaction Reference ID / TRX ID');
-      return;
-    }
-
-    if (paymentMethod === 'card' && (!cardNumber || !cardExpiry || !cardCvc)) {
-      toast.error('Please complete all card details');
-      return;
-    }
-
     setLoading(true);
     try {
-      await paymentsService.createPayment({
-        listing_id: listing.id,
-        user_id: user.id,
-        amount: selectedPackage.price,
-        currency: 'PKR',
-        method: paymentMethod === 'local' ? 'JazzCash / EasyPaisa / Bank' : 'Credit / Debit Card',
-        status: paymentMethod === 'card' ? 'completed' : 'pending',
-        transaction_id: transactionId.trim() || `CARD-${Date.now()}`,
-        receipt_url: receiptUrl.trim() || undefined,
-        package_name: selectedPackage.name,
-        duration_days: selectedPackage.durationDays,
-        notes: `Promotion package: ${selectedPackage.name} for listing: ${listing.title}`,
+      // Call Vercel Serverless Function to initialize Safepay Tracker
+      const res = await fetch('/api/safepay/create-tracker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listing_id: listing.id,
+          user_id: user.id,
+          package_id: selectedPackage.id,
+        }),
       });
 
-      if (paymentMethod === 'card') {
-        toast.success(`🎉 ${selectedPackage.name} activated successfully for 30 days!`);
-      } else {
-        toast.success('✅ Payment submitted! Admin will verify your transaction shortly.');
+      const data = await res.json();
+      if (!res.ok || !data.checkout_url) {
+        throw new Error(data.error || 'Failed to initialize Safepay checkout');
       }
 
-      if (onSuccess) onSuccess();
-      onClose();
+      toast.loading('Redirecting to Safepay Checkout...');
+      // Redirect user to Safepay Hosted Checkout URL
+      window.location.href = data.checkout_url;
     } catch (err: any) {
-      console.error('Promotion error:', err);
-      toast.error(err.message || 'Failed to submit payment. Please try again.');
-    } finally {
+      console.error('Safepay checkout error:', err);
+      toast.error(err.message || 'Payment server connection failed. Please try again.');
       setLoading(false);
     }
   };
@@ -156,7 +134,7 @@ export const PromoteListingModal: React.FC<PromoteListingModalProps> = ({
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+          <form onSubmit={handleSafepayCheckout} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
             {/* Step 1: Select Package */}
             <div>
               <label className="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3">
@@ -203,122 +181,24 @@ export const PromoteListingModal: React.FC<PromoteListingModalProps> = ({
               </div>
             </div>
 
-            {/* Step 2: Payment Method */}
-            <div>
-              <label className="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3">
-                2. Select Payment Method
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('local')}
-                  className={`flex items-center justify-center gap-2 p-3.5 rounded-2xl border-2 font-medium text-sm transition-all cursor-pointer ${
-                    paymentMethod === 'local'
-                      ? 'border-primary-600 bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400'
-                      : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
-                  }`}
-                >
-                  <Smartphone className="w-5 h-5" />
-                  <span>JazzCash / EasyPaisa / Bank</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('card')}
-                  className={`flex items-center justify-center gap-2 p-3.5 rounded-2xl border-2 font-medium text-sm transition-all cursor-pointer ${
-                    paymentMethod === 'card'
-                      ? 'border-primary-600 bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400'
-                      : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
-                  }`}
-                >
-                  <CreditCard className="w-5 h-5" />
-                  <span>Credit / Debit Card</span>
-                </button>
+            {/* Step 2: Safepay Gateway Info */}
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/50 to-blue-50/50 dark:from-slate-800/80 dark:to-slate-800/40 border border-indigo-100 dark:border-slate-700 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-200">
+                <CreditCard className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <span>Safepay Sandbox Hosted Checkout</span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                You will be redirected securely to Safepay Checkout to complete test payment using credit/debit card or supported mobile wallets.
+              </p>
+              <div className="flex items-center gap-3 pt-1 text-[11px] text-slate-500 font-medium">
+                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                  <ShieldCheck size={14} /> PCI-DSS Compliant
+                </span>
+                <span className="flex items-center gap-1 text-slate-500">
+                  <Lock size={12} /> 256-Bit SSL Encrypted
+                </span>
               </div>
             </div>
-
-            {/* Step 3: Payment Details */}
-            {paymentMethod === 'local' ? (
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                  <Building2 className="w-4 h-4 text-primary-500" />
-                  <span>Transfer Accounts</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                    <div className="font-bold text-red-600">JazzCash / EasyPaisa</div>
-                    <div className="text-slate-800 dark:text-slate-200 font-mono text-sm font-semibold mt-1">0300-1234567</div>
-                    <div className="text-slate-500">Title: All In One Classified</div>
-                  </div>
-                  <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                    <div className="font-bold text-emerald-600">Meezan Bank (IBAN)</div>
-                    <div className="text-slate-800 dark:text-slate-200 font-mono text-xs font-semibold mt-1">PK12MEZN00012345678901</div>
-                    <div className="text-slate-500">Title: All In One Classified</div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Transaction ID / Reference TRX ID *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. 01928374652"
-                    value={transactionId}
-                    onChange={(e) => setTransactionId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Receipt Image URL (Optional)
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://..."
-                    value={receiptUrl}
-                    onChange={(e) => setReceiptUrl(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Card Number</label>
-                  <input
-                    type="text"
-                    placeholder="4242 •••• •••• 4242"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-primary-500 outline-none font-mono"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Expiry Date</label>
-                    <input
-                      type="text"
-                      placeholder="MM/YY"
-                      value={cardExpiry}
-                      onChange={(e) => setCardExpiry(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-primary-500 outline-none font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">CVC / CVV</label>
-                    <input
-                      type="password"
-                      maxLength={4}
-                      placeholder="123"
-                      value={cardCvc}
-                      onChange={(e) => setCardCvc(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-primary-500 outline-none font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Total Summary & Submit Button */}
             <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
@@ -331,9 +211,9 @@ export const PromoteListingModal: React.FC<PromoteListingModalProps> = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-700 hover:to-indigo-700 text-white font-bold rounded-2xl shadow-lg shadow-primary-500/25 transition-all cursor-pointer disabled:opacity-50"
+                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-primary-600 hover:from-indigo-700 hover:to-primary-700 text-white font-bold rounded-2xl shadow-lg shadow-indigo-500/25 transition-all cursor-pointer disabled:opacity-50"
               >
-                <span>{loading ? 'Processing...' : 'Pay & Promote'}</span>
+                <span>{loading ? 'Initializing Checkout...' : 'Proceed to Safepay Checkout'}</span>
                 <ArrowRight size={18} />
               </button>
             </div>
