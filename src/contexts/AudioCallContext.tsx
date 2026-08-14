@@ -72,12 +72,22 @@ const getRtcConfig = (): RTCConfiguration => {
     { urls: 'stun:stun.relay.metered.ca:80' },
     { urls: 'stun:stun.relay.metered.ca:443' },
 
-    // Dedicated Metered TURN UDP & TCP Transports (Separate objects for standard browser compatibility)
+    // Primary Production Metered TURN Relay Servers (UDP & TCP Transports)
     { urls: 'turn:global.relay.metered.ca:80', username: turnUser, credential: turnCred },
     { urls: 'turn:global.relay.metered.ca:443', username: turnUser, credential: turnCred },
     { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: turnUser, credential: turnCred },
     { urls: 'turn:global.relay.metered.ca:443?transport=tcp', username: turnUser, credential: turnCred },
     { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: turnUser, credential: turnCred },
+    { urls: 'turn:relay.metered.ca:80', username: turnUser, credential: turnCred },
+    { urls: 'turn:relay.metered.ca:443', username: turnUser, credential: turnCred },
+    { urls: 'turn:relay.metered.ca:443?transport=tcp', username: turnUser, credential: turnCred },
+    { urls: 'turns:relay.metered.ca:443?transport=tcp', username: turnUser, credential: turnCred },
+
+    // Metered OpenRelay Fallback TURN Servers
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
   ];
 
   if (envTurnUrl) {
@@ -95,7 +105,6 @@ const getRtcConfig = (): RTCConfiguration => {
   const config: RTCConfiguration = {
     iceServers,
     iceCandidatePoolSize: 10,
-    // Production default is "all" (direct P2P for local/open networks, TURN fallback for CGNAT)
     iceTransportPolicy: isForceRelay ? 'relay' : 'all',
   };
 
@@ -408,6 +417,10 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     };
 
+    (pc as any).onicecandidateerror = (event: any) => {
+      console.warn(`[WebRTC Diagnostics ❌] ICE Candidate / TURN Server Error: Code ${event.errorCode} (${event.errorText || 'Unknown'}) | Server URL: ${event.url || 'N/A'} | Address: ${event.address}:${event.port}`);
+    };
+
     pc.ontrack = (event) => {
       console.log('[WebRTC Diagnostics] 🎵 Remote Track Received -> Kind:', event.track.kind, 'ID:', event.track.id, 'Streams:', event.streams?.length);
       let stream: MediaStream;
@@ -549,24 +562,25 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               iceCandidatesQueueRef.current.push(payload.candidate);
             }
           }
-        } else if (payload.type === 'rejected') {
+        } else if (payload.type === 'rejected' || payload.type === 'call-declined') {
+          console.log('[WebRTC Diagnostics] Received call-declined signal from receiver!');
           stopRingtone();
           toast.error('Call declined');
           setCallState('ended');
+          cleanupCall();
           setTimeout(() => {
             setCallState('idle');
             setActiveTargetUser(null);
-            cleanupCall();
-          }, 1200);
+          }, 400);
         } else if (payload.type === 'ended') {
           stopRingtone();
           toast('Call ended');
           setCallState('ended');
+          cleanupCall();
           setTimeout(() => {
             setCallState('idle');
             setActiveTargetUser(null);
-            cleanupCall();
-          }, 1200);
+          }, 400);
         }
       })
       .subscribe();
@@ -700,10 +714,11 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [user, activeTargetUser, getMicrophoneStream, sendSignal, createPeerConnection, processIceQueue, startRemotePlayback, unlockAudioContext, stopRingtone, inspectPeerConnection]);
 
-  // Reject Incoming Call
+  // Reject / Decline Incoming Call
   const rejectCall = useCallback(() => {
-    console.log('[WebRTC Debug] Rejecting call');
+    console.log('[WebRTC Debug] Rejecting / Declining incoming call');
     if (activeTargetUser) {
+      sendSignal(activeTargetUser.id, 'call-declined', {});
       sendSignal(activeTargetUser.id, 'rejected', {});
     }
     setCallState('idle');
