@@ -49,13 +49,19 @@ const getRtcConfig = (): RTCConfiguration => {
   const envTurnUser = (import.meta as any).env?.VITE_TURN_USERNAME || nodeProc?.env?.NEXT_PUBLIC_TURN_USERNAME || '';
   const envTurnCred = (import.meta as any).env?.VITE_TURN_CREDENTIAL || nodeProc?.env?.NEXT_PUBLIC_TURN_CREDENTIAL || '';
 
-  // Check URL query param ?force_all=true to disable relay-only mode if needed
-  const isForceAll = typeof window !== 'undefined' && window.location.search.includes('force_all=true');
+  // Debug query params: ?force_relay=true forces relay-only mode; production default is "all"
+  const isForceRelay = typeof window !== 'undefined' && (
+    window.location.search.includes('force_relay=true') ||
+    window.location.search.includes('relay_only=true')
+  );
 
   const defaultTurnUser = '6dc76375a8c5a83541d57f49';
   const defaultTurnCred = 'DtPn0f2wyVPKJBmM';
+  const turnUser = envTurnUser || defaultTurnUser;
+  const turnCred = envTurnCred || defaultTurnCred;
 
   const iceServers: RTCIceServer[] = [
+    // Public STUN Servers
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
@@ -63,35 +69,37 @@ const getRtcConfig = (): RTCConfiguration => {
     { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:global.stun.twilio.com:3478' },
     { urls: 'stun:stun.cloudflare.com:3478' },
-    // Dedicated Production Metered TURN Relay Servers for Mobile 4G/5G Carrier NAT Traversal
-    {
-      urls: [
-        'turn:global.relay.metered.ca:80',
-        'turn:global.relay.metered.ca:443',
-        'turns:global.relay.metered.ca:443?transport=tcp',
-      ],
-      username: envTurnUser || defaultTurnUser,
-      credential: envTurnCred || defaultTurnCred,
-    },
+    { urls: 'stun:stun.relay.metered.ca:80' },
+    { urls: 'stun:stun.relay.metered.ca:443' },
+
+    // Dedicated Metered TURN UDP & TCP Transports (Separate objects for standard browser compatibility)
+    { urls: 'turn:global.relay.metered.ca:80', username: turnUser, credential: turnCred },
+    { urls: 'turn:global.relay.metered.ca:443', username: turnUser, credential: turnCred },
+    { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: turnUser, credential: turnCred },
+    { urls: 'turn:global.relay.metered.ca:443?transport=tcp', username: turnUser, credential: turnCred },
+    { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: turnUser, credential: turnCred },
   ];
 
   if (envTurnUrl) {
     console.log('[WebRTC Debug] Custom TURN Server configured from environment variables:', envTurnUrl);
-    iceServers.push({
-      urls: envTurnUrl.split(','),
-      username: envTurnUser || undefined,
-      credential: envTurnCred || undefined,
+    const customUrls = envTurnUrl.split(',').map((u: string) => u.trim()).filter(Boolean);
+    customUrls.forEach((url: string) => {
+      iceServers.push({
+        urls: url,
+        username: envTurnUser || undefined,
+        credential: envTurnCred || undefined,
+      });
     });
   }
 
   const config: RTCConfiguration = {
     iceServers,
     iceCandidatePoolSize: 10,
-    // Force TURN relay policy for guaranteed cross-network CGNAT NAT traversal
-    iceTransportPolicy: isForceAll ? 'all' : 'relay',
+    // Production default is "all" (direct P2P for local/open networks, TURN fallback for CGNAT)
+    iceTransportPolicy: isForceRelay ? 'relay' : 'all',
   };
 
-  console.log(`[WebRTC Diagnostics] RTCConfiguration initialized -> TransportPolicy: [${config.iceTransportPolicy.toUpperCase()}]`);
+  console.log(`[WebRTC Diagnostics] RTCConfiguration initialized -> TransportPolicy: [${config.iceTransportPolicy.toUpperCase()}] | ICE Servers: ${config.iceServers?.length}`);
 
   return config;
 };
