@@ -19,6 +19,9 @@ export const PaymentResultPage: React.FC = () => {
 
     const checkPayment = async () => {
       try {
+        // Trigger instant backend verification with Safepay
+        await fetch(`/api/safepay/verify-tracker?tracker=${encodeURIComponent(tracker)}`).catch(() => {});
+
         const { data } = await supabase
           .from('payments')
           .select('*, listing:listings(id, title)')
