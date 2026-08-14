@@ -49,8 +49,8 @@ const getRtcConfig = (): RTCConfiguration => {
   const envTurnUser = (import.meta as any).env?.VITE_TURN_USERNAME || nodeProc?.env?.NEXT_PUBLIC_TURN_USERNAME || '';
   const envTurnCred = (import.meta as any).env?.VITE_TURN_CREDENTIAL || nodeProc?.env?.NEXT_PUBLIC_TURN_CREDENTIAL || '';
 
-  // Check URL query param ?relay_only=true for TURN relay isolation testing
-  const isRelayOnly = typeof window !== 'undefined' && window.location.search.includes('relay_only=true');
+  // Check URL query param ?force_all=true to disable relay-only mode if needed
+  const isForceAll = typeof window !== 'undefined' && window.location.search.includes('force_all=true');
 
   const defaultTurnUser = '6dc76375a8c5a83541d57f49';
   const defaultTurnCred = 'DtPn0f2wyVPKJBmM';
@@ -87,12 +87,11 @@ const getRtcConfig = (): RTCConfiguration => {
   const config: RTCConfiguration = {
     iceServers,
     iceCandidatePoolSize: 10,
+    // Force TURN relay policy for guaranteed cross-network CGNAT NAT traversal
+    iceTransportPolicy: isForceAll ? 'all' : 'relay',
   };
 
-  if (isRelayOnly) {
-    console.warn('[WebRTC Diagnostics] 🧪 RELAY-ONLY TEST MODE ACTIVATED! Forcing iceTransportPolicy = "relay"');
-    config.iceTransportPolicy = 'relay';
-  }
+  console.log(`[WebRTC Diagnostics] RTCConfiguration initialized -> TransportPolicy: [${config.iceTransportPolicy.toUpperCase()}]`);
 
   return config;
 };
@@ -569,17 +568,36 @@ export const AudioCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   }, [user?.id, startRingtone, stopRingtone, cleanupCall, processIceQueue, startRemotePlayback, inspectPeerConnection]);
 
-  // Call Duration Timer
+  // Call Duration Timer & Periodic Realtime WebRTC Traffic Monitor
   useEffect(() => {
+    let statsInterval: any = null;
+
     if (callState === 'connected') {
       timerRef.current = setInterval(() => {
         setCallDuration(prev => prev + 1);
       }, 1000);
+
+      // Periodically log ICE Candidate Pair & RTP Traffic (bytesSent, bytesReceived, packetsSent, packetsReceived)
+      statsInterval = setInterval(() => {
+        if (pcRef.current) {
+          pcRef.current.getStats().then(stats => {
+            const statsMap = stats as Map<string, any>;
+            stats.forEach(report => {
+              if (report.type === 'candidate-pair' && (report.selected || report.state === 'succeeded' || report.nominated)) {
+                const localCand = statsMap.get(report.localCandidateId);
+                const remoteCand = statsMap.get(report.remoteCandidateId);
+                console.log(`[RTP Realtime Stats 📊] LocalType: [${localCand?.candidateType || 'unknown'}] | RemoteType: [${remoteCand?.candidateType || 'unknown'}] | BytesSent: ${report.bytesSent ?? 0} | BytesReceived: ${report.bytesReceived ?? 0} | PacketsSent: ${report.packetsSent ?? 0} | PacketsReceived: ${report.packetsReceived ?? 0}`);
+              }
+            });
+          }).catch(() => {});
+        }
+      }, 2500);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (statsInterval) clearInterval(statsInterval);
     };
   }, [callState]);
 
