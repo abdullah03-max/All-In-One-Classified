@@ -178,11 +178,8 @@ export const AIChatbotModal: React.FC<AIChatbotModalProps> = ({ isOpen, onClose 
                   <Bot size={22} className="text-white animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base flex items-center gap-2">
+                  <h3 className="font-bold text-base">
                     Marketplace AI Assistant
-                    <span className="text-[10px] bg-emerald-400/30 text-emerald-200 px-2 py-0.5 rounded-full font-medium border border-emerald-300/30">
-                      Groq Llama 3.3
-                    </span>
                   </h3>
                   <p className="text-xs text-primary-100">Conversational AI for general & marketplace queries</p>
                 </div>
@@ -342,7 +339,7 @@ export const AIChatbotModal: React.FC<AIChatbotModalProps> = ({ isOpen, onClose 
                 </button>
               </div>
               <p className="text-[10px] text-slate-400 text-center mt-1.5">
-                Groq Llama 3.3 Engine • English, Urdu & Roman Urdu Supported
+                AI Assistant • English, Urdu & Roman Urdu Supported
               </p>
             </div>
           </motion.div>
