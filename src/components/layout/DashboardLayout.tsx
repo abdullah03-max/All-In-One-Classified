@@ -12,6 +12,7 @@ import { Avatar, Badge } from '../ui';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../utils/helpers';
 import Icon from '../ui/Icon';
+import AIChatbotModal from '../chat/AIChatbotModal';
 
 interface NavItem {
   label: string;
@@ -33,6 +34,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, navItems, t
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -95,6 +97,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, navItems, t
     }
   }
 
+  // Ensure AI Assistant is always present in dashboard sidebar
+  if (!finalNavItems.some(item => item.label === 'AI Assistant')) {
+    finalNavItems = [
+      ...finalNavItems,
+      { label: 'AI Assistant', icon: 'Sparkles', to: '#ai-assistant' }
+    ];
+  }
+
   const isActive = (to: string) => location.pathname === to || location.pathname.startsWith(to + '/');
 
   const SidebarContent = () => (
@@ -106,29 +116,54 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, navItems, t
         </Link>
       </div>
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-        {finalNavItems.map(item => (
-          <Link
-            key={item.to}
-            to={item.to}
-            onClick={() => setMobileOpen(false)}
-            className={cn(
-              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
-              isActive(item.to)
-                ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100',
-              collapsed && 'justify-center px-2'
-            )}
-            title={collapsed ? item.label : undefined}
-          >
-            <Icon name={item.icon} size={18} className="shrink-0" />
-            {!collapsed && (
-              <span className="flex-1 text-sm">{item.label}</span>
-            )}
-            {!collapsed && item.badge && item.badge > 0 && (
-              <Badge variant="info" className="text-xs">{item.badge}</Badge>
-            )}
-          </Link>
-        ))}
+        {finalNavItems.map(item => {
+          if (item.to === '#ai-assistant') {
+            return (
+              <button
+                key={item.label}
+                onClick={() => {
+                  setMobileOpen(false);
+                  setIsAiModalOpen(true);
+                }}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all w-full text-left',
+                  'text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20',
+                  collapsed && 'justify-center px-2'
+                )}
+                title={collapsed ? item.label : undefined}
+              >
+                <Icon name={item.icon} size={18} className="shrink-0 text-yellow-500" />
+                {!collapsed && (
+                  <span className="flex-1 text-sm font-semibold">{item.label}</span>
+                )}
+              </button>
+            );
+          }
+
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
+                isActive(item.to)
+                  ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100',
+                collapsed && 'justify-center px-2'
+              )}
+              title={collapsed ? item.label : undefined}
+            >
+              <Icon name={item.icon} size={18} className="shrink-0" />
+              {!collapsed && (
+                <span className="flex-1 text-sm">{item.label}</span>
+              )}
+              {!collapsed && item.badge && item.badge > 0 && (
+                <Badge variant="info" className="text-xs">{item.badge}</Badge>
+              )}
+            </Link>
+          );
+        })}
       </nav>
 
       {/* Collapse button */}
@@ -219,6 +254,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, navItems, t
           </div>
         </div>
       </div>
+
+      {/* AI Assistant Chatbot Modal */}
+      <AIChatbotModal isOpen={isAiModalOpen} onClose={() => setIsAiModalOpen(false)} />
     </div>
   );
 };
