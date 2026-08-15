@@ -167,8 +167,8 @@ export const AIChatbotModal: React.FC<AIChatbotModalProps> = ({ isOpen, onClose 
             exit={{ opacity: 0, y: 50, scale: 0.95 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className={cn(
-              "fixed z-50 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden",
-              "bottom-0 right-0 w-full h-[90vh] sm:h-[620px] sm:w-[450px] sm:bottom-6 sm:right-6 sm:rounded-2xl"
+              "fixed z-50 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden rounded-2xl transition-all",
+              "bottom-4 right-3 left-3 sm:left-auto sm:bottom-6 sm:right-6 w-auto sm:w-[420px] max-w-[calc(100vw-1.5rem)] h-[85vh] sm:h-[580px] max-h-[calc(100vh-3rem)]"
             )}
           >
             {/* Header */}
@@ -259,7 +259,7 @@ export const AIChatbotModal: React.FC<AIChatbotModalProps> = ({ isOpen, onClose 
 
                     <div className="group relative">
                       <div className={cn(
-                        "p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-sm whitespace-pre-line",
+                        "p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-sm whitespace-pre-line break-words max-w-full overflow-hidden",
                         msg.sender === 'user'
                           ? "bg-primary-600 text-white rounded-tr-none"
                           : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-none"
