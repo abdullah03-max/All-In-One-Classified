@@ -22,7 +22,11 @@ const SUGGESTED_QUESTIONS = [
   "What categories are available?"
 ];
 
-const API_BASE_URL = import.meta.env.VITE_AI_BACKEND_URL || '';
+// Fallback to production Vercel serverless API when running on localhost dev mode
+const API_BASE_URL = import.meta.env.VITE_AI_BACKEND_URL || 
+  (import.meta.env.DEV ? 'https://all-in-one-classified.vercel.app' : '');
+
+const LOCAL_GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
 
 interface AIChatbotModalProps {
   isOpen: boolean;
@@ -72,7 +76,7 @@ export const AIChatbotModal: React.FC<AIChatbotModalProps> = ({ isOpen, onClose 
 
       let aiAnswer = '';
 
-      // 1. Call Vercel Serverless / FastAPI Endpoint (/api/chat)
+      // 1. Call API Endpoint (/api/chat) or Live Vercel API if on localhost
       try {
         const endpoint = API_BASE_URL ? `${API_BASE_URL.replace(/\/$/, '')}/api/chat` : '/api/chat';
         const res = await fetch(endpoint, {
@@ -94,7 +98,12 @@ export const AIChatbotModal: React.FC<AIChatbotModalProps> = ({ isOpen, onClose 
         console.warn('API endpoint fetch attempt failed:', err);
       }
 
-      // 2. Client fallback logic if serverless endpoint is offline
+      // 2. Direct Groq API Call if VITE_GROQ_API_KEY is present in local .env
+      if (!aiAnswer && LOCAL_GROQ_KEY) {
+        aiAnswer = await callGroqDirectLocal(query, historyPayload, LOCAL_GROQ_KEY);
+      }
+
+      // 3. Fallback logic
       if (!aiAnswer) {
         aiAnswer = generateClientFallback(query);
       }
@@ -348,6 +357,65 @@ export const AIChatbotModal: React.FC<AIChatbotModalProps> = ({ isOpen, onClose 
     </AnimatePresence>
   );
 };
+
+// Direct Groq Call if VITE_GROQ_API_KEY is defined in local .env
+async function callGroqDirectLocal(query: string, history: any[], apiKey: string): Promise<string> {
+  const systemInstruction = `You are the official conversational AI Assistant for "All In One Classified" marketplace in Pakistan.
+
+YOUR CAPABILITIES & BEHAVIOR:
+1. MULTILINGUAL AUTOMATIC DETECTION:
+   - Detect the user's input language automatically: English, Urdu (اردو), Roman Urdu (e.g. "ma ad kaisy post kro?", "yar mobile sell karna hai"), or mixed English-Urdu.
+   - Respond fluently in the EXACT SAME LANGUAGE and tone as the user!
+
+2. GENERAL AI KNOWLEDGE:
+   - For general questions ("Hello", "How are you?", "What is Python?", "What is Artificial Intelligence?", "Who was Albert Einstein?"), answer naturally and accurately using your general AI knowledge!
+
+3. MARKETPLACE KNOWLEDGE:
+   - To post an ad: Click 'Post Ad' in top navigation, select Category & Subcategory, fill title, description, price (PKR), product condition (New, Used, Refurbished, Open Box), upload photos & submit.
+   - To promote an ad: Go to Dashboard -> My Listings -> click '🚀 Promote'. Supported packages: Urgent Badge (PKR 500 / 7 days), Featured Ad (PKR 1200 / 15 days), Premium VIP (PKR 2500 / 30 days). Online payments are handled securely via Safepay.
+   - Account verification: Go to Dashboard -> Account Verification, submit CNIC details for verified seller checkmark.
+   - Communication: Built-in text messaging, reply, delete, voice messages recording & playback, and Call Seller phone number reveal.
+`;
+
+  const messages: any[] = [{ role: 'system', content: systemInstruction }];
+
+  if (Array.isArray(history)) {
+    for (const m of history.slice(-6)) {
+      messages.push({
+        role: m.sender === 'assistant' ? 'assistant' : 'user',
+        content: m.content || '',
+      });
+    }
+  }
+
+  messages.push({ role: 'user', content: query });
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages,
+        temperature: 0.4,
+        max_tokens: 700
+      })
+    });
+
+    if (!res.ok) {
+      throw new Error(`Groq API Status ${res.status}`);
+    }
+
+    const data = await res.json();
+    return data?.choices?.[0]?.message?.content?.trim() || "I am here to help you!";
+  } catch (err) {
+    console.error('Direct local Groq API error:', err);
+    return "";
+  }
+}
 
 function generateClientFallback(query: string): string {
   const q = query.toLowerCase();
