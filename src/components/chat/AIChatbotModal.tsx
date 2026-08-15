@@ -70,27 +70,39 @@ export const AIChatbotModal: React.FC<AIChatbotModalProps> = ({ isOpen, onClose 
         content: m.content
       }));
 
-      const endpoint = API_BASE_URL ? `${API_BASE_URL.replace(/\/$/, '')}/api/chat` : '/api/chat';
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: query,
-          history: historyPayload
-        })
-      });
+      let aiAnswer = '';
 
-      if (!res.ok) {
-        throw new Error(`Status ${res.status}`);
+      // 1. Call Vercel Serverless / FastAPI Endpoint (/api/chat)
+      try {
+        const endpoint = API_BASE_URL ? `${API_BASE_URL.replace(/\/$/, '')}/api/chat` : '/api/chat';
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: query,
+            history: historyPayload
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.answer) {
+            aiAnswer = data.answer;
+          }
+        }
+      } catch (err) {
+        console.warn('API endpoint fetch attempt failed:', err);
       }
 
-      const data = await res.json();
-      const aiAnswer = data.answer || "I am here to help you!";
+      // 2. Client fallback logic if serverless endpoint is offline
+      if (!aiAnswer) {
+        aiAnswer = generateClientFallback(query);
+      }
 
       const aiMsg: Message = {
         id: `ai_${Date.now()}`,
         sender: 'assistant',
-        content: aiAnswer,
+        content: aiAnswer || "I am here to help you!",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
@@ -100,7 +112,7 @@ export const AIChatbotModal: React.FC<AIChatbotModalProps> = ({ isOpen, onClose 
       const aiMsg: Message = {
         id: `ai_${Date.now()}`,
         sender: 'assistant',
-        content: "I am here to help you! Ask me anything about All In One Classified marketplace, or any general question in English, Urdu, or Roman Urdu.",
+        content: "I am here to help you! Ask me anything about All In One Classified marketplace, or any general question.",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages(prev => [...prev, aiMsg]);
@@ -339,5 +351,35 @@ export const AIChatbotModal: React.FC<AIChatbotModalProps> = ({ isOpen, onClose 
     </AnimatePresence>
   );
 };
+
+function generateClientFallback(query: string): string {
+  const q = query.toLowerCase();
+
+  if (q.includes("hello") || q.includes("hi") || q.includes("salam") || q.includes("aoa")) {
+    return "Walaikumasalam! Welcome to **All In One Classified** AI Assistant! How can I assist you today?";
+  }
+  if (q.includes("python")) {
+    return "Python is a high-level, multi-purpose programming language widely used in web development, artificial intelligence, machine learning, and data science!";
+  }
+  if (q.includes("ai") || q.includes("artificial intelligence")) {
+    return "Artificial Intelligence (AI) is the simulation of human intelligence processes by computer algorithms, including machine learning, natural language processing, and automated reasoning.";
+  }
+  if (q.includes("post") || q.includes("ad") || q.includes("sell") || q.includes("kaisy") || q.includes("kaise") || q.includes("پوسٹ")) {
+    return "To post an ad on **All In One Classified**:\n1. Click **'Post Ad'** at the top.\n2. Select your Category & Subcategory.\n3. Add title, description, price (PKR), product condition (New, Used, Refurbished, Open Box).\n4. Upload photos and click **Submit**!";
+  }
+  if (q.includes("promote") || q.includes("featured") || q.includes("urgent") || q.includes("safepay") || q.includes("payment")) {
+    return "You can promote your listing using **Safepay Online Payment**:\n- **Urgent Badge**: PKR 500 (7 Days)\n- **Featured Ad**: PKR 1,200 (15 Days)\n- **Premium VIP**: PKR 2,500 (30 Days)\n\nGo to **Dashboard → My Listings** and click **🚀 Promote**!";
+  }
+  if (q.includes("verify") || q.includes("account")) {
+    return "To get a verified seller badge, go to **Dashboard → Account Verification**, upload your CNIC details, and submit for admin approval.";
+  }
+  if (q.includes("contact") || q.includes("seller") || q.includes("chat") || q.includes("call")) {
+    return "You can contact sellers using real-time text chat, voice notes, or viewing the verified seller phone number!";
+  }
+  if (q.includes("category") || q.includes("categories")) {
+    return "Available categories include: Vehicles, Real Estate, Electronics, Fashion, Mobile Phones, Jobs, Services, and Home Appliances.";
+  }
+  return "I am here to help you! You can ask me any question about All In One Classified marketplace, or any general topic in English, Urdu, or Roman Urdu.";
+}
 
 export default AIChatbotModal;
