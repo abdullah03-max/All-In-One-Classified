@@ -1,7 +1,7 @@
 # All In One Classified Marketplace - Official Knowledge Base
 
 ## Overview & Architecture
-All In One Classified is a modern, high-performance Pakistani classifieds marketplace platform built with React, Vite, TypeScript, Tailwind CSS, Supabase (PostgreSQL, Authentication, Realtime, Database RPCs), and Vercel Serverless Functions.
+All In One Classified is a modern, high-performance Pakistani classifieds marketplace platform built with React 19, Vite, TypeScript, Tailwind CSS, Supabase (PostgreSQL, Authentication, Realtime, Database RPCs), and Vercel Serverless Functions.
 
 The platform connects buyers and sellers across Pakistan, allowing users to browse, search, post, manage, and promote classified advertisements across various categories such as Vehicles, Real Estate, Electronics, Fashion, Services, Jobs, Mobile Phones, and Home Appliances.
 
@@ -10,7 +10,7 @@ The platform connects buyers and sellers across Pakistan, allowing users to brow
 ## Authentication & User Accounts
 - **Registration**: Users can sign up with email and password or social auth via Supabase Authentication.
 - **Roles**: The platform supports 4 primary user roles:
-  1. **Buyer**: Can search, browse, view details, chat, send voice messages, place audio calls, and favorite listings.
+  1. **Buyer**: Can search, browse, view details, send text messages, send voice messages, favorite listings, and view seller phone numbers.
   2. **Seller**: Can post ads, edit listings, upload images, manage listings in My Listings dashboard, and promote ads.
   3. **Moderator**: Can review reported listings, approve or reject pending ads, and monitor marketplace compliance.
   4. **Admin / Super Admin**: Has full access to global analytics, user management, admin/moderator assignment, category management, payment monitoring, system configuration, and database settings.
@@ -18,18 +18,24 @@ The platform connects buyers and sellers across Pakistan, allowing users to brow
 
 ---
 
-## Categories & Listings
+## Categories & Product Conditions
 - **Hierarchy**: Support for main categories, subcategories, and sub-subcategories (e.g. Vehicles -> Cars -> Toyota -> Corolla).
-- **Posting an Ad**: Users navigate to "Post Ad" (`/post-ad`), fill in title, description, category, subcategory, price (PKR), product condition (New, Used, Refurbished), location (City/Area in Pakistan), upload images, and submit.
-- **Listing Filters**: Users can filter listings by search keywords, category, price range, city/location, product condition, and sorting order (Latest, Price Low-High, Price High-Low, Most Popular).
+- **Product Conditions Supported**:
+  - New
+  - Used
+  - Refurbished
+  - Open Box
+- **Posting an Ad**: Users navigate to "Post Ad" (`/post-ad`), fill in title, description, category, subcategory, price (PKR), product condition, location (City/Area in Pakistan), upload images, and submit.
+- **Listing Filters**: Users can filter listings by search keywords, category, price range, city/location, product condition, gender filters where applicable, and sorting order (Latest, Price Low-High, Price High-Low, Most Popular).
 - **Favorites & Wishlist**: Users can click the heart icon on any listing to save it to their Saved Ads (`/dashboard/favorites`).
 
 ---
 
-## Communication (Messaging, Voice & Calls)
+## Communication (Text Messaging & Voice Messages)
 - **Realtime Chat**: Buyers and sellers can communicate directly through the built-in real-time chat messaging system (`/chat` or `/dashboard/messages`).
+- **Text Messages**: Full text messaging with reply functionality, message deletion, and read receipts.
 - **Voice Messages**: Users can record, send, and play back voice notes directly within chat conversations using the built-in audio recorder and player.
-- **Audio Calls**: WebRTC/AudioCallContext enables real-time peer-to-peer audio calls between buyer and seller directly within the marketplace browser window.
+- **Phone Calls**: Buyers can click "Call Seller" on any ad detail page to reveal the seller's mobile phone number for direct phone calls.
 
 ---
 
@@ -54,7 +60,7 @@ The platform connects buyers and sellers across Pakistan, allowing users to brow
 
 ---
 
-## Marketplace Rules & Policies
+## Marketplace Rules & Safety
 - Fraudulent, illegal, weapons, counterfeit goods, or deceptive listings are strictly prohibited and will be removed by moderators.
-- Users should deal safely by communicating through the marketplace chat/call system.
+- Users should deal safely by communicating through the marketplace chat system or calling the verified phone number.
 - Always inspect items in person before finalizing transactions for physical goods.
