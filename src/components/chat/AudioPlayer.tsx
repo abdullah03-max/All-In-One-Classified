@@ -37,11 +37,29 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     onVoiceEndedRef.current = onVoiceEnded;
   }, [onVoiceEnded]);
 
-  // Extract real audio waveform data using Web Audio API safely
+  // Extract real audio waveform data using Web Audio API safely or from URL params
   useEffect(() => {
     let isCancelled = false;
 
     const generateWaveform = async () => {
+      // 1. Check if URL contains pre-calculated waveform from recording (?wf=20,45,80...)
+      try {
+        const urlObj = new URL(src, window.location.origin);
+        const wfParam = urlObj.searchParams.get('wf');
+        if (wfParam) {
+          const parsed = wfParam.split(',').map(v => parseInt(v, 10)).filter(n => !isNaN(n));
+          if (parsed.length > 0) {
+            const maxVal = Math.max(...parsed, 1);
+            const normalized = parsed.map(b => Math.max(12, Math.round((b / maxVal) * 100)));
+            if (!isCancelled) {
+              setWaveformBars(normalized);
+              return;
+            }
+          }
+        }
+      } catch (_) {}
+
+      // 2. Otherwise decode audio buffer using Web Audio API
       let audioCtx: AudioContext | null = null;
       try {
         const response = await fetch(src);
@@ -65,7 +83,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         }
 
         const maxVal = Math.max(...bars, 0.001);
-        const normalized = bars.map(b => Math.max(15, Math.round((b / maxVal) * 100)));
+        const normalized = bars.map(b => Math.max(12, Math.round((b / maxVal) * 100)));
 
         if (!isCancelled) {
           setWaveformBars(normalized);

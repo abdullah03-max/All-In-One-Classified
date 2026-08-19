@@ -415,27 +415,40 @@ export const usersService = {
 
     const getStartedUrl = appOrigin;
     const supportUrl = `${appOrigin}/contact`;
-    const userName = params.name || 'Valued Member';
+    const userName = params.name || 'Member';
 
     const emailBody = `
-      <div style="font-family: Arial, Helvetica, sans-serif; background-color: #ffffff; padding: 24px; color: #111827; max-width: 500px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px;">
-        <h2 style="font-size: 18px; font-weight: 700; color: #1d4ed8; margin: 0 0 16px 0;">All in One Marketplace</h2>
-        <p style="font-size: 14px; line-height: 1.5; margin: 0 0 12px 0;">Hello ${userName},</p>
-        <p style="font-size: 14px; line-height: 1.5; margin: 0 0 20px 0;">Your account registration is verified and complete. You can access your account below:</p>
-        <div style="margin: 20px 0;">
-          <a href="${getStartedUrl}" style="background-color: #1d4ed8; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;">Access Account</a>
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"><title>Welcome to All In One</title></head>
+      <body style="margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b;">
+        <div style="max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+          <div style="background-color: #2563eb; padding: 24px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700;">All In One</h1>
+          </div>
+          <div style="padding: 28px 24px;">
+            <h2 style="font-size: 18px; margin: 0 0 14px 0; color: #0f172a;">Welcome, ${userName}!</h2>
+            <p style="font-size: 14px; line-height: 1.6; color: #475569; margin: 0 0 20px 0;">Your account registration is complete and your email is verified. You can now post ads, explore products, and chat directly with buyers and sellers.</p>
+            <div style="text-align: center; margin: 28px 0;">
+              <a href="${getStartedUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">Get Started</a>
+            </div>
+            <p style="font-size: 13px; line-height: 1.5; color: #64748b; margin: 0;">If you ever have any questions, our support team is here to help at <a href="${supportUrl}" style="color: #2563eb; text-decoration: none;">${supportUrl}</a>.</p>
+          </div>
+          <div style="background-color: #f1f5f9; padding: 16px 24px; text-align: center; font-size: 12px; color: #94a3b8;">
+            © ${new Date().getFullYear()} All In One Marketplace. All rights reserved.
+          </div>
         </div>
-        <p style="font-size: 12px; color: #6b7280; margin-top: 24px; border-top: 1px solid #f3f4f6; padding-top: 12px;">If you need assistance, contact support: ${supportUrl}</p>
-      </div>
+      </body>
+      </html>
     `;
 
-    const plainText = `Hello ${userName},\n\nYour account registration is verified and complete. Access your account: ${getStartedUrl}\nSupport: ${supportUrl}`;
+    const plainText = `Welcome to All In One, ${userName}!\n\nYour account registration is complete. You can now browse listings and post ads.\n\nAccess your account: ${getStartedUrl}\nSupport: ${supportUrl}`;
 
     try {
       const { data: resData, error: resError } = await supabase.functions.invoke('send-email', {
         body: {
           to: params.email,
-          subject: `Security Notice: Account Registration Verified for ${userName}`,
+          subject: `Welcome to All In One Marketplace, ${userName}!`,
           text: plainText,
           html: emailBody
         }

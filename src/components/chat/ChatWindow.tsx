@@ -137,13 +137,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
   }, [user]);
 
   // Voice recording states
-  const [isRecording, setIsRecording] = useState(false);
+  const [voiceState, setVoiceState] = useState<'idle' | 'recording' | 'preview' | 'sending'>('idle');
   const [recordingTime, setRecordingTime] = useState(0);
-  const [uploadingProgress, setUploadingProgress] = useState<number | null>(null);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
+  const [recordedWaveform, setRecordedWaveform] = useState<number[]>([]);
+  const [, setUploadingProgress] = useState<number | null>(null);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<number | null>(null);
+  const isRecordingCanceledRef = useRef(false);
 
   // The messages scroll container — we scroll THIS, not the page
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -302,9 +306,40 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
     }
   }, [messages, loading, scrollToBottom, scrollToOriginalMessage]);
 
-  const isRecordingCanceledRef = useRef(false);
+  // Extract amplitude bars from audio blob
+  const extractWaveformFromBlob = async (blob: Blob): Promise<number[]> => {
+    let audioCtx: AudioContext | null = null;
+    try {
+      const arrayBuffer = await blob.arrayBuffer();
+      audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+      const rawData = decoded.getChannelData(0);
+      const samples = 32;
+      const blockSize = Math.floor(rawData.length / samples);
+      const bars: number[] = [];
+      for (let i = 0; i < samples; i++) {
+        const start = blockSize * i;
+        let sum = 0;
+        for (let j = 0; j < blockSize; j++) {
+          sum += Math.abs(rawData[start + j]);
+        }
+        bars.push(sum / blockSize);
+      }
+      const maxVal = Math.max(...bars, 0.001);
+      return bars.map(b => Math.max(12, Math.round((b / maxVal) * 100)));
+    } catch {
+      return [
+        25, 45, 75, 35, 60, 90, 50, 30, 65, 80, 95, 40, 70, 85, 30, 55,
+        75, 40, 60, 85, 95, 50, 35, 70, 80, 45, 60, 30, 50, 35, 20, 15
+      ];
+    } finally {
+      if (audioCtx && audioCtx.state !== 'closed') {
+        try { await audioCtx.close(); } catch {}
+      }
+    }
+  };
 
-  // Voice recording controls
+  // 1. IDLE -> RECORDING
   const startRecording = async () => {
     try {
       isRecordingCanceledRef.current = false;
@@ -314,7 +349,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
       let mediaRecorder: MediaRecorder;
       try {
         mediaRecorder = new MediaRecorder(stream, options);
-      } catch (e) {
+      } catch {
         mediaRecorder = new MediaRecorder(stream);
       }
       mediaRecorderRef.current = mediaRecorder;
@@ -328,17 +363,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(track => track.stop());
         if (isRecordingCanceledRef.current) {
-          console.log('[Voice Message Debug] Recording was canceled. Discarding audio blob.');
           audioChunksRef.current = [];
           return;
         }
-        if (audioChunksRef.current.length === 0) return;
-        const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' });
-        await sendVoiceMessage(audioBlob);
+        if (audioChunksRef.current.length === 0) {
+          setVoiceState('idle');
+          return;
+        }
+        const blob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' });
+        const previewUrl = URL.createObjectURL(blob);
+        const wf = await extractWaveformFromBlob(blob);
+
+        setRecordedBlob(blob);
+        setRecordedAudioUrl(previewUrl);
+        setRecordedWaveform(wf);
+        setVoiceState('preview');
       };
 
       mediaRecorder.start();
-      setIsRecording(true);
+      setVoiceState('recording');
       setRecordingTime(0);
       recordingTimerRef.current = window.setInterval(() => {
         setRecordingTime(prev => prev + 1);
@@ -349,45 +392,48 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
     }
   };
 
-  const stopAndSendRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+  // 2. RECORDING -> PREVIEW (STOP button only stops and moves to preview)
+  const stopRecordingToPreview = () => {
+    if (mediaRecorderRef.current && voiceState === 'recording') {
       isRecordingCanceledRef.current = false;
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
         recordingTimerRef.current = null;
       }
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
     }
   };
 
-  const cancelRecording = () => {
+  // 3. PREVIEW or RECORDING -> IDLE (DELETE button discards recording)
+  const deleteRecordingPreview = () => {
     isRecordingCanceledRef.current = true;
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
     }
     audioChunksRef.current = [];
-    if (mediaRecorderRef.current) {
-      try {
-        if (mediaRecorderRef.current.state !== 'inactive') {
-          mediaRecorderRef.current.stop();
-        }
-      } catch (e) {}
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop(); } catch {}
     }
-    setIsRecording(false);
+    if (recordedAudioUrl) {
+      URL.revokeObjectURL(recordedAudioUrl);
+    }
+    setRecordedBlob(null);
+    setRecordedAudioUrl(null);
+    setRecordedWaveform([]);
+    setVoiceState('idle');
     setRecordingTime(0);
-    toast.success('Recording canceled');
   };
 
-  const sendVoiceMessage = async (blob: Blob) => {
-    if (!user) return;
+  // 4. PREVIEW -> SENDING -> SENT -> IDLE (SEND button uploads and sends)
+  const sendRecordingPreview = async () => {
+    if (!user || !recordedBlob) return;
+    setVoiceState('sending');
     setSending(true);
     setUploadingProgress(0);
 
     try {
-      // Standardize audio content type across all mobile and desktop browsers
-      const rawType = blob.type || 'audio/webm';
+      const rawType = recordedBlob.type || 'audio/webm';
       const mimeType = rawType.split(';')[0].trim();
       let fileExt = 'webm';
       if (mimeType.includes('mp4') || mimeType.includes('aac')) fileExt = 'mp4';
@@ -397,30 +443,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
       const fileName = `voice_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
       const filePath = `chat-audios/${conversation.id}/${fileName}`;
 
-      console.log('[Voice Message Debug] Uploading voice message -> Path:', filePath, 'MIME:', mimeType, 'Size:', blob.size);
-
       setUploadingProgress(40);
       const { error: uploadErr } = await supabase.storage
         .from('listing-images')
-        .upload(filePath, blob, {
+        .upload(filePath, recordedBlob, {
           contentType: mimeType,
           cacheControl: '3600',
           upsert: true,
         });
 
-      if (uploadErr) {
-        console.error('[Voice Message Debug] Storage upload error:', uploadErr);
-        throw uploadErr;
-      }
+      if (uploadErr) throw uploadErr;
       setUploadingProgress(85);
 
       const { data: { publicUrl } } = supabase.storage
         .from('listing-images')
         .getPublicUrl(filePath);
 
-      console.log('[Voice Message Debug] Voice message public URL:', publicUrl);
-
-      const rawAudioContent = `[audio]:${publicUrl}`;
+      const wfString = recordedWaveform.join(',');
+      const audioUrlWithWf = `${publicUrl}?wf=${wfString}`;
+      const rawAudioContent = `[audio]:${audioUrlWithWf}`;
       const finalContent = replyingToMsg ? formatMessageReply(replyingToMsg, rawAudioContent) : rawAudioContent;
       setReplyingToMsg(null);
 
@@ -436,6 +477,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
       console.error('[Voice Message Debug] Failed to send voice message:', err);
       toast.error('Failed to upload voice message: ' + (err.message || 'Error'));
     } finally {
+      if (recordedAudioUrl) {
+        URL.revokeObjectURL(recordedAudioUrl);
+      }
+      setRecordedBlob(null);
+      setRecordedAudioUrl(null);
+      setRecordedWaveform([]);
+      setVoiceState('idle');
       setSending(false);
       setUploadingProgress(null);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -975,7 +1023,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
 
           <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 focus-within:border-primary-400 focus-within:ring-1 focus-within:ring-primary-400/30 transition-all px-2.5 py-1">
             
-            {isRecording ? (
+            {voiceState === 'recording' ? (
               // Recording UI
               <div className="flex-1 flex items-center justify-between py-2 px-1">
                 <div className="flex items-center gap-2">
@@ -984,13 +1032,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
                     Recording: {formatRecordingTime(recordingTime)}
                   </span>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      cancelRecording();
+                      deleteRecordingPreview();
                     }}
                     className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
                     title="Cancel Recording"
@@ -1002,14 +1050,52 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      stopAndSendRecording();
+                      stopRecordingToPreview();
                     }}
-                    className="px-3.5 py-1 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1 transition-all cursor-pointer"
+                    className="px-3.5 py-1 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                    title="Stop and Preview"
                   >
-                    <Send size={12} />
-                    <span>Send</span>
+                    <span className="w-2.5 h-2.5 bg-white rounded-xs" />
+                    <span>Stop</span>
                   </button>
                 </div>
+              </div>
+            ) : voiceState === 'preview' ? (
+              // Preview UI (After stopping recording)
+              <div className="flex-1 flex items-center justify-between gap-2 py-1">
+                <button
+                  type="button"
+                  onClick={deleteRecordingPreview}
+                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer shrink-0"
+                  title="Delete Recording"
+                >
+                  <Trash2 size={18} className="text-red-500" />
+                </button>
+                
+                {recordedAudioUrl && (
+                  <div className="flex-1 min-w-0">
+                    <AudioPlayer
+                      src={recordedAudioUrl}
+                      isMine={true}
+                    />
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={sendRecordingPreview}
+                  disabled={sending}
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-sm shrink-0"
+                >
+                  <Send size={14} />
+                  <span>Send</span>
+                </button>
+              </div>
+            ) : voiceState === 'sending' ? (
+              // Sending Progress UI
+              <div className="flex-1 flex items-center justify-center py-2.5 text-xs font-semibold text-primary-600 dark:text-primary-400 gap-2">
+                <div className="w-3.5 h-3.5 border-2 border-primary-600/40 border-t-primary-600 rounded-full animate-spin" />
+                <span>Sending voice message...</span>
               </div>
             ) : (
               // Standard Input UI
