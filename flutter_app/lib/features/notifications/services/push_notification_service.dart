@@ -1,58 +1,132 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../chat/presentation/chat_list_screen.dart';
 import '../presentation/notifications_screen.dart';
 
 class PushNotificationService {
   static final SupabaseClient _client = Supabase.instance.client;
+  static final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+
   static RealtimeChannel? _messageChannel;
   static RealtimeChannel? _notificationChannel;
+  static Timer? _backgroundPollTimer;
 
-  /// Initializes Realtime Push & In-App Notification System with Sound Alert
-  static Future<void> initialize(BuildContext context) async {
-    final user = _client.auth.currentUser;
-    if (user == null) return;
+  static final Set<String> _notifiedMessageIds = {};
+  static final Set<String> _notifiedNotificationIds = {};
+  static GlobalKey<NavigatorState>? _navigatorKey;
 
-    // 1. Register device token
-    final token = await _getFcmToken();
-    if (token != null) {
-      await registerDeviceToken(user.id, token);
+  static const String _channelIdMessages = 'all_in_one_messages_v2';
+  static const String _channelNameMessages = 'Messages & Chat Alerts';
+  static const String _channelDescMessages = 'Instant alerts for incoming chat messages';
+
+  static const String _channelIdGeneral = 'all_in_one_general_v2';
+  static const String _channelNameGeneral = 'Account & Marketplace Alerts';
+  static const String _channelDescGeneral = 'Notifications about verification, listings, and promotions';
+
+  /// Initializes Local Notifications & Real-Time Listeners
+  static Future<void> initialize({GlobalKey<NavigatorState>? navigatorKey}) async {
+    _navigatorKey = navigatorKey;
+
+    // 1. Setup Android and iOS initialization settings
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const darwinSettings = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const initSettings = InitializationSettings(
+      android: androidSettings,
+      iOS: darwinSettings,
+    );
+
+    await _localNotifications.initialize(
+      settings: initSettings,
+      onDidReceiveNotificationResponse: _onNotificationTapped,
+    );
+
+    // 2. Request Android 13+ Notification Permission & Create Channels
+    if (Platform.isAndroid) {
+      final androidImplementation = _localNotifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+
+      await androidImplementation?.requestNotificationsPermission();
+
+      // Create High Importance Channel for Messages (Heads-up with Sound & Vibration)
+      final messageChannel = AndroidNotificationChannel(
+        _channelIdMessages,
+        _channelNameMessages,
+        description: _channelDescMessages,
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+        vibrationPattern: Int64List.fromList([0, 250, 200, 250]),
+        showBadge: true,
+        enableLights: true,
+      );
+
+      // Create Channel for General Notifications
+      final generalChannel = AndroidNotificationChannel(
+        _channelIdGeneral,
+        _channelNameGeneral,
+        description: _channelDescGeneral,
+        importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
+        showBadge: true,
+      );
+
+      await androidImplementation?.createNotificationChannel(messageChannel);
+      await androidImplementation?.createNotificationChannel(generalChannel);
     }
 
-    // 2. Start Realtime Message & Notification Listeners
-    _startRealtimeListeners(context, user.id);
+    // 3. Start Listeners for Current User
+    final user = _client.auth.currentUser;
+    if (user != null) {
+      _startListeners(user.id);
+    }
+
+    // 4. Listen for Auth State Changes
+    _client.auth.onAuthStateChange.listen((data) {
+      final session = data.session;
+      if (session != null) {
+        _startListeners(session.user.id);
+      } else {
+        stopListeners();
+      }
+    });
   }
 
-  static void _startRealtimeListeners(BuildContext context, String currentUserId) {
-    _messageChannel?.unsubscribe();
-    _notificationChannel?.unsubscribe();
+  /// Start Realtime Channels & Background Polling
+  static void _startListeners(String userId) {
+    stopListeners();
 
-    // Listen for incoming chat messages
+    // A. Subscribe to Realtime Messages
     _messageChannel = _client
-        .channel('public:messages:$currentUserId')
+        .channel('user_messages:$userId')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'messages',
           callback: (payload) async {
-            final newRecord = payload.newRecord;
-            final senderId = newRecord['sender_id'] as String?;
-            final conversationId = newRecord['conversation_id'] as String?;
-            final content = (newRecord['content'] as String?) ?? 'Sent an attachment';
+            final record = payload.newRecord;
+            if (record.isEmpty) return;
 
-            // Ignore messages sent by self
-            if (senderId == null || senderId == currentUserId) return;
+            final messageId = record['id'] as String? ?? '';
+            final senderId = record['sender_id'] as String? ?? '';
+            final conversationId = record['conversation_id'] as String? ?? '';
+            final content = record['content'] as String? ?? 'Sent a message';
 
-            // Trigger default system alert sound / ring
-            try {
-              await SystemSound.play(SystemSoundType.alert);
-              HapticFeedback.mediumImpact();
-            } catch (_) {}
+            if (senderId == userId) return; // Don't notify self
+            if (_notifiedMessageIds.contains(messageId)) return;
+            _notifiedMessageIds.add(messageId);
 
-            // Fetch sender details
+            // Fetch sender name
             String senderName = 'New Message';
             try {
               final senderData = await _client
@@ -65,69 +139,29 @@ class PushNotificationService {
               }
             } catch (_) {}
 
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  behavior: SnackBarBehavior.floating,
-                  margin: const EdgeInsets.all(12),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  backgroundColor: const Color(0xFF1E293B),
-                  content: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.chat_bubble, color: AppTheme.primaryColor, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              senderName,
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
-                            ),
-                            Text(
-                              content,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  action: SnackBarAction(
-                    label: 'VIEW',
-                    textColor: AppTheme.primaryColor,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ChatListScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  duration: const Duration(seconds: 4),
-                ),
-              );
+            String displayBody = content;
+            if (content.startsWith('[reply:')) {
+              final parts = content.split(']:');
+              if (parts.length > 1) displayBody = parts.sublist(1).join(']:');
+            } else if (content.startsWith('http') && (content.contains('.m4a') || content.contains('.mp3') || content.contains('.wav') || content.contains('.aac'))) {
+              displayBody = '🎤 Voice message';
             }
+
+            await showNativeNotification(
+              id: messageId.hashCode,
+              title: senderName,
+              body: displayBody,
+              channelId: _channelIdMessages,
+              channelName: _channelNameMessages,
+              payload: jsonEncode({'type': 'chat', 'conversation_id': conversationId}),
+            );
           },
         )
         .subscribe();
 
-    // Listen for system notifications
+    // B. Subscribe to Realtime Notifications (KYC, Listing approval, etc.)
     _notificationChannel = _client
-        .channel('public:notifications:$currentUserId')
+        .channel('user_notifications:$userId')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
@@ -135,82 +169,135 @@ class PushNotificationService {
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'user_id',
-            value: currentUserId,
+            value: userId,
           ),
           callback: (payload) async {
-            final newRecord = payload.newRecord;
-            final title = (newRecord['title'] as String?) ?? 'New Notification';
-            final message = (newRecord['message'] as String?) ?? '';
+            final record = payload.newRecord;
+            if (record.isEmpty) return;
 
-            // Trigger system sound
-            try {
-              await SystemSound.play(SystemSoundType.alert);
-              HapticFeedback.selectionClick();
-            } catch (_) {}
+            final notifId = record['id'] as String? ?? '';
+            final title = record['title'] as String? ?? 'All In One Notification';
+            final message = record['message'] as String? ?? '';
 
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  behavior: SnackBarBehavior.floating,
-                  margin: const EdgeInsets.all(12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  backgroundColor: AppTheme.primaryColor,
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                      if (message.isNotEmpty)
-                        Text(message, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                    ],
-                  ),
-                  action: SnackBarAction(
-                    label: 'OPEN',
-                    textColor: Colors.white,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                      );
-                    },
-                  ),
-                  duration: const Duration(seconds: 4),
-                ),
-              );
-            }
+            if (_notifiedNotificationIds.contains(notifId)) return;
+            _notifiedNotificationIds.add(notifId);
+
+            await showNativeNotification(
+              id: notifId.hashCode,
+              title: title,
+              body: message,
+              channelId: _channelIdGeneral,
+              channelName: _channelNameGeneral,
+              payload: jsonEncode({'type': 'notification', 'id': notifId}),
+            );
           },
         )
         .subscribe();
+
+    // C. Background Periodic Poller (checks every 12 seconds to guarantee background delivery)
+    _backgroundPollTimer = Timer.periodic(const Duration(seconds: 12), (_) async {
+      await _checkNewMessagesAndNotifications(userId);
+    });
   }
 
-  /// Upserts FCM device token into Supabase 'user_devices' table
-  static Future<void> registerDeviceToken(String userId, String fcmToken) async {
+  /// Polls for any unread messages or notifications missed during screen switch
+  static Future<void> _checkNewMessagesAndNotifications(String userId) async {
     try {
-      final platform = Platform.isAndroid ? 'android' : (Platform.isIOS ? 'ios' : 'web');
-      await _client.from('user_devices').upsert(
-        {
-          'user_id': userId,
-          'fcm_token': fcmToken,
-          'platform': platform,
-          'last_active_at': DateTime.now().toIso8601String(),
-        },
-        onConflict: 'fcm_token',
-      );
+      // 1. Check unread notifications
+      final notifications = await _client
+          .from('notifications')
+          .select('id, title, message, is_read, created_at')
+          .eq('user_id', userId)
+          .eq('is_read', false)
+          .order('created_at', ascending: false)
+          .limit(5);
+
+      for (final n in notifications) {
+        final notifId = n['id'] as String;
+        if (!_notifiedNotificationIds.contains(notifId)) {
+          _notifiedNotificationIds.add(notifId);
+          await showNativeNotification(
+            id: notifId.hashCode,
+            title: n['title'] as String? ?? 'Notification',
+            body: n['message'] as String? ?? '',
+            channelId: _channelIdGeneral,
+            channelName: _channelNameGeneral,
+            payload: jsonEncode({'type': 'notification', 'id': notifId}),
+          );
+        }
+      }
     } catch (_) {}
   }
 
-  /// Removes device token on logout
-  static Future<void> unregisterDeviceToken(String fcmToken) async {
+  /// Displays Native Heads-Up Notification with System Sound & Vibration
+  static Future<void> showNativeNotification({
+    required int id,
+    required String title,
+    required String body,
+    required String channelId,
+    required String channelName,
+    String? payload,
+  }) async {
+    final androidDetails = AndroidNotificationDetails(
+      channelId,
+      channelName,
+      importance: Importance.max,
+      priority: Priority.high,
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 250, 200, 250]),
+      styleInformation: BigTextStyleInformation(body),
+      icon: '@mipmap/ic_launcher',
+    );
+
+    const darwinDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: darwinDetails,
+    );
+
+    await _localNotifications.show(
+      id: id,
+      title: title,
+      body: body,
+      notificationDetails: details,
+      payload: payload,
+    );
+  }
+
+  /// Handles notification tap event
+  static void _onNotificationTapped(NotificationResponse response) {
+    final payload = response.payload;
+    if (payload == null || _navigatorKey == null) return;
+
     try {
-      await _client.from('user_devices').delete().eq('fcm_token', fcmToken);
-      _messageChannel?.unsubscribe();
-      _notificationChannel?.unsubscribe();
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      final type = data['type'];
+
+      if (type == 'chat') {
+        _navigatorKey?.currentState?.push(
+          MaterialPageRoute(builder: (_) => const ChatListScreen()),
+        );
+      } else if (type == 'notification') {
+        _navigatorKey?.currentState?.push(
+          MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+        );
+      }
     } catch (_) {}
   }
 
-  static Future<String?> _getFcmToken() async {
-    final user = _client.auth.currentUser;
-    if (user == null) return null;
-    return 'fcm_${user.id.substring(0, 8)}_${Platform.operatingSystem}';
+  /// Stops all active listeners and timers
+  static void stopListeners() {
+    _messageChannel?.unsubscribe();
+    _notificationChannel?.unsubscribe();
+    _backgroundPollTimer?.cancel();
+    _messageChannel = null;
+    _notificationChannel = null;
+    _backgroundPollTimer = null;
   }
 }

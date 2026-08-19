@@ -10,6 +10,8 @@ import 'features/favorites/presentation/favorites_screen.dart';
 import 'features/profile/presentation/profile_screen.dart';
 import 'features/notifications/services/push_notification_service.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 class MarketplaceApp extends StatelessWidget {
   const MarketplaceApp({super.key});
 
@@ -20,6 +22,7 @@ class MarketplaceApp extends StatelessWidget {
       child: BlocProvider(
         create: (context) => AuthCubit(context.read<AuthRepository>()),
         child: MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'All In One',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
@@ -47,7 +50,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   void initState() {
     super.initState();
-    PushNotificationService.initialize(context);
+    PushNotificationService.initialize(navigatorKey: navigatorKey);
   }
 
   final List<Widget> _screens = const [
