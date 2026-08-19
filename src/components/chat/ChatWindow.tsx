@@ -142,7 +142,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onMessageSent, on
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
   const [recordedWaveform, setRecordedWaveform] = useState<number[]>([]);
-  const [, setUploadingProgress] = useState<number | null>(null);
+  const [uploadingProgress, setUploadingProgress] = useState<number | null>(null);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
