@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
-const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || '';
+const GROQ_MODELS = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.6-27b', 'llama-3.3-70b-versatile'];
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
@@ -16,7 +16,7 @@ YOUR CAPABILITIES & BEHAVIOR:
    - If the user speaks English, reply in clear English!
 
 2. GENERAL AI KNOWLEDGE:
-   - For general questions ("Hello", "How are you?", "What is Python?", "What is Artificial Intelligence?", "Who was Albert Einstein?", "How do I create a website?"), answer naturally and accurately using your general AI knowledge in the user's language!
+   - For general questions ("Hello", "How are you?", "What is Python?", "What is Artificial Intelligence?", "Who was Albert Einstein?", "Who is Quaid-e-Azam?", "How do I create a website?", math, science, history, coding), answer naturally, intelligently, and accurately using your broad AI knowledge in the user's language!
    - DO NOT say "I don't have information about this" for general knowledge questions!
 
 3. MARKETPLACE KNOWLEDGE:
@@ -85,7 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 2. Build Prompt Context
     const contextText = Array.isArray(contextChunks) && contextChunks.length > 0
       ? contextChunks.map(c => `[Source: ${c.source || 'kb'}]\n${c.content}`).join('\n\n')
-      : 'No specific vector chunks retrieved. Use general AI knowledge or marketplace guide.';
+      : 'All In One Classified: post ads, promote with Safepay, verify CNIC, real-time chat, browse categories.';
 
     const systemPrompt = SYSTEM_INSTRUCTION.replace('{context}', contextText);
 
@@ -103,41 +103,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     messages.push({ role: 'user', content: userQuery });
 
-    if (!GROQ_API_KEY) {
-      return res.status(200).json({
-        success: true,
-        answer: generateServerlessFallback(userQuery),
-        sources: [],
-      });
+    // 4. Call Groq API with supported models
+    let answer = '';
+    for (const model of GROQ_MODELS) {
+      try {
+        const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${GROQ_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: 0.5,
+            max_tokens: 750,
+          }),
+        });
+
+        if (groqRes.ok) {
+          const groqData = await groqRes.json();
+          let rawContent = groqData?.choices?.[0]?.message?.content || '';
+          // Remove any <think> reasoning tags if emitted by reasoning models
+          rawContent = rawContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+          if (rawContent) {
+            answer = rawContent;
+            break;
+          }
+        }
+      } catch (e) {
+        console.warn(`Model ${model} attempt failed:`, e);
+      }
     }
 
-    // 4. Call Groq API securely on the server
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages,
-        temperature: 0.4,
-        max_tokens: 750,
-      }),
-    });
-
-    if (!groqRes.ok) {
-      const errText = await groqRes.text();
-      console.error('Groq API Error:', errText);
-      return res.status(200).json({
-        success: true,
-        answer: generateServerlessFallback(userQuery),
-        sources: [],
-      });
+    if (!answer) {
+      answer = generateServerlessFallback(userQuery);
     }
-
-    const groqData = await groqRes.json();
-    const answer = groqData?.choices?.[0]?.message?.content || "I am here to help you!";
 
     return res.status(200).json({
       success: true,

@@ -366,9 +366,13 @@ YOUR CAPABILITIES & BEHAVIOR:
 1. MULTILINGUAL AUTOMATIC DETECTION:
    - Detect the user's input language automatically: English, Urdu (اردو), Roman Urdu (e.g. "ma ad kaisy post kro?", "yar mobile sell karna hai"), or mixed English-Urdu.
    - Respond fluently in the EXACT SAME LANGUAGE and tone as the user!
+   - If the user speaks Roman Urdu, reply naturally in friendly Roman Urdu!
+   - If the user speaks Urdu, reply in proper Urdu (اردو)!
+   - If the user speaks English, reply in clear English!
 
 2. GENERAL AI KNOWLEDGE:
-   - For general questions ("Hello", "How are you?", "What is Python?", "What is Artificial Intelligence?", "Who was Albert Einstein?"), answer naturally and accurately using your general AI knowledge!
+   - For general questions ("Hello", "How are you?", "What is Python?", "What is Artificial Intelligence?", "Who was Albert Einstein?", "Who is Quaid-e-Azam?", "How do I create a website?", math, science, history, coding), answer naturally, intelligently, and accurately using your broad AI knowledge in the user's language!
+   - DO NOT say "I don't have information about this" for general knowledge questions!
 
 3. MARKETPLACE KNOWLEDGE:
    - To post an ad: Click 'Post Ad' in top navigation, select Category & Subcategory, fill title, description, price (PKR), product condition (New, Used, Refurbished, Open Box), upload photos & submit.
@@ -390,31 +394,36 @@ YOUR CAPABILITIES & BEHAVIOR:
 
   messages.push({ role: 'user', content: query });
 
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        temperature: 0.4,
-        max_tokens: 700
-      })
-    });
+  const models = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.6-27b', 'llama-3.3-70b-versatile'];
 
-    if (!res.ok) {
-      throw new Error(`Groq API Status ${res.status}`);
+  for (const model of models) {
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.5,
+          max_tokens: 750
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        let content = data?.choices?.[0]?.message?.content?.trim() || "";
+        content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+        if (content) return content;
+      }
+    } catch (err) {
+      console.warn(`Model ${model} attempt failed:`, err);
     }
-
-    const data = await res.json();
-    return data?.choices?.[0]?.message?.content?.trim() || "I am here to help you!";
-  } catch (err) {
-    console.error('Direct local Groq API error:', err);
-    return "";
   }
+
+  return "";
 }
 
 function generateClientFallback(query: string): string {

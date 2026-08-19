@@ -19,7 +19,12 @@ class AiChatMessage {
 class AiAssistantService {
   static const String _groqApiKey = String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
   static const String _groqUrl = 'https://api.groq.com/openai/v1/chat/completions';
-  static const String _groqModel = 'llama-3.3-70b-versatile';
+  static const List<String> _groqModels = [
+    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
+    'qwen/qwen3.6-27b',
+    'llama-3.3-70b-versatile',
+  ];
   static const String _backendEndpoint = SupabaseConfig.chatApiEndpoint;
 
   static const String _systemPrompt = '''
@@ -34,7 +39,7 @@ YOUR CAPABILITIES & BEHAVIOR:
    - If the user speaks English, reply in clear English!
 
 2. GENERAL AI KNOWLEDGE:
-   - For general questions ("Hello", "How are you?", "What is Python?", "What is Artificial Intelligence?", "Who was Albert Einstein?", "How do I create a website?", math, science, history, coding, general life questions), answer naturally, intelligently, and accurately using your broad AI knowledge in the user's language!
+   - For general questions ("Hello", "How are you?", "What is Python?", "What is Artificial Intelligence?", "Who was Albert Einstein?", "Who is Quaid-e-Azam?", "How do I create a website?", math, science, history, coding, general life questions), answer naturally, intelligently, and accurately using your broad AI knowledge in the user's language!
    - DO NOT say "I don't have information about this" for general knowledge questions!
 
 3. MARKETPLACE KNOWLEDGE:
@@ -49,7 +54,7 @@ YOUR CAPABILITIES & BEHAVIOR:
    - Use clean, structured Markdown formatting (bolding, bullet points, numbered lists).
 ''';
 
-  /// Sends query to Groq Llama 3.3 70B with conversation history and fallback
+  /// Sends query to Groq with conversation history and fallback
   Future<String> askAi({
     required String query,
     required List<AiChatMessage> history,
@@ -57,45 +62,7 @@ YOUR CAPABILITIES & BEHAVIOR:
     final cleanQuery = query.trim();
     if (cleanQuery.isEmpty) return '';
 
-    // 1. Direct High-Speed Groq Llama 3.3 70B API Call
-    try {
-      final messages = <Map<String, String>>[
-        {'role': 'system', 'content': _systemPrompt}
-      ];
-
-      for (final m in history.take(6)) {
-        messages.add({
-          'role': m.sender == 'assistant' ? 'assistant' : 'user',
-          'content': m.content,
-        });
-      }
-
-      messages.add({'role': 'user', 'content': cleanQuery});
-
-      final response = await http.post(
-        Uri.parse(_groqUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_groqApiKey',
-        },
-        body: jsonEncode({
-          'model': _groqModel,
-          'messages': messages,
-          'temperature': 0.5,
-          'max_tokens': 800,
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
-        final answer = data['choices']?[0]?['message']?['content'] as String?;
-        if (answer != null && answer.trim().isNotEmpty) {
-          return answer.trim();
-        }
-      }
-    } catch (_) {}
-
-    // 2. Serverless Backend Endpoint Fallback
+    // 1. Primary: Serverless Backend Endpoint (Runs with GROQ_API_KEY on Vercel)
     try {
       final historyPayload = history.take(6).map((m) => {
         'sender': m.sender,
@@ -109,15 +76,61 @@ YOUR CAPABILITIES & BEHAVIOR:
           'message': cleanQuery,
           'history': historyPayload,
         }),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         if (data is Map && data['answer'] != null) {
-          return data['answer'].toString().trim();
+          final ans = data['answer'].toString().trim();
+          if (ans.isNotEmpty) return ans;
         }
       }
     } catch (_) {}
+
+    // 2. Secondary: Direct High-Speed Groq API Call (if key is supplied)
+    if (_groqApiKey.isNotEmpty) {
+      for (final model in _groqModels) {
+        try {
+          final messages = <Map<String, String>>[
+            {'role': 'system', 'content': _systemPrompt}
+          ];
+
+          for (final m in history.take(6)) {
+            messages.add({
+              'role': m.sender == 'assistant' ? 'assistant' : 'user',
+              'content': m.content,
+            });
+          }
+
+          messages.add({'role': 'user', 'content': cleanQuery});
+
+          final response = await http.post(
+            Uri.parse(_groqUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $_groqApiKey',
+            },
+            body: jsonEncode({
+              'model': model,
+              'messages': messages,
+              'temperature': 0.5,
+              'max_tokens': 800,
+            }),
+          ).timeout(const Duration(seconds: 12));
+
+          if (response.statusCode == 200) {
+            final data = jsonDecode(utf8.decode(response.bodyBytes));
+            String? answer = data['choices']?[0]?['message']?['content'] as String?;
+            if (answer != null) {
+              answer = answer.replaceAll(RegExp(r'<think>[\s\S]*?<\/think>'), '').trim();
+              if (answer.isNotEmpty) {
+                return answer;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    }
 
     // 3. Intelligent Bilingual Offline Fallback
     return _generateFallback(cleanQuery);
@@ -144,6 +157,11 @@ YOUR CAPABILITIES & BEHAVIOR:
     // Chat / Messages
     if (q.contains('chat') || q.contains('message') || q.contains('contact seller') || q.contains('rabta')) {
       return "You can chat in real-time with any seller directly on any listing by tapping **Chat with Seller**. You can send text messages and voice audio notes!";
+    }
+
+    // Categories
+    if (q.contains('category') || q.contains('categories') || q.contains('mobile') || q.contains('car') || q.contains('property')) {
+      return "All In One has categories across:\n- Mobiles & Tablets\n- Vehicles & Cars\n- Property for Sale & Rent\n- Electronics & Home Appliances\n- Bikes & Motorcycles\n- Fashion & Beauty\n- Services & Jobs";
     }
 
     // Default friendly response
