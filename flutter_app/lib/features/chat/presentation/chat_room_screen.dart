@@ -12,6 +12,8 @@ import '../../listings/data/listing_model.dart';
 import '../../listings/presentation/listing_detail_screen.dart';
 import '../data/chat_models.dart';
 import '../data/chat_repository.dart';
+import '../services/presence_service.dart';
+import '../services/audio_cache_service.dart';
 import 'widgets/audio_waveform_bubble.dart';
 
 enum VoiceRecordingState {
@@ -23,6 +25,7 @@ enum VoiceRecordingState {
 
 class ChatRoomScreen extends StatefulWidget {
   final String conversationId;
+  final String? otherUserId;
   final String listingTitle;
   final String otherUserName;
   final String? otherUserAvatarUrl;
@@ -34,6 +37,7 @@ class ChatRoomScreen extends StatefulWidget {
   const ChatRoomScreen({
     super.key,
     required this.conversationId,
+    this.otherUserId,
     required this.listingTitle,
     required this.otherUserName,
     this.otherUserAvatarUrl,
@@ -116,6 +120,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           _messages = msgs;
         });
 
+        // Prefetch voice notes in background for instant playback
+        for (final m in msgs) {
+          if (m.isAudioVoiceNote && m.audioUrl != null) {
+            AudioCacheService.prefetch(m.audioUrl!);
+          }
+        }
+
         final user = _client.auth.currentUser;
         if (user != null) {
           _repository.markMessagesRead(widget.conversationId, user.id);
@@ -183,6 +194,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         _messages = msgs;
         _isLoading = false;
       });
+
+      // Background prefetch all audio voice notes for 0-delay instant playback
+      for (final m in msgs) {
+        if (m.isAudioVoiceNote && m.audioUrl != null) {
+          AudioCacheService.prefetch(m.audioUrl!);
+        }
+      }
+
       _repository.markMessagesRead(widget.conversationId, user.id);
       _scrollToBottom();
     }
@@ -207,6 +226,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             if (record.isEmpty) return;
 
             final newMsg = ChatMessageModel.fromJson(record);
+
+            if (newMsg.isAudioVoiceNote && newMsg.audioUrl != null) {
+              AudioCacheService.prefetch(newMsg.audioUrl!);
+            }
 
             if (mounted) {
               setState(() {
@@ -418,6 +441,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       );
 
       if (rawAudioUrl != null) {
+        AudioCacheService.registerLocalRecording(rawAudioUrl, _recordedFilePath!);
+
         final wfString = _previewWaveform.map((v) => (v * 100).round()).join(',');
         final audioUrlWithWf = rawAudioUrl.contains('?')
             ? '$rawAudioUrl&wf=$wfString'
@@ -482,10 +507,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       await _audioPlayer.stop();
       _audioPlayer.setPlaybackRate(_playbackRate);
 
-      if (url.startsWith('http')) {
-        await _audioPlayer.play(UrlSource(url));
+      // Instant 0-delay playback from local cached file
+      final localOrCachedPath = await AudioCacheService.getAudioPath(url);
+
+      if (localOrCachedPath.startsWith('http')) {
+        await _audioPlayer.play(UrlSource(localOrCachedPath));
       } else {
-        await _audioPlayer.play(DeviceFileSource(url));
+        await _audioPlayer.play(DeviceFileSource(localOrCachedPath));
       }
 
       setState(() {
@@ -530,77 +558,132 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
-        title: Row(
-          children: [
-            if (isAdmin)
-              const CircleAvatar(
-                radius: 18,
-                backgroundColor: Color(0xFF3B82F6),
-                child: Icon(Icons.shield, color: Colors.white, size: 20),
-              )
-            else if (widget.otherUserAvatarUrl != null && widget.otherUserAvatarUrl!.trim().isNotEmpty)
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: AppTheme.primaryLight,
-                child: ClipOval(
-                  child: CachedNetworkImage(
-                    imageUrl: widget.otherUserAvatarUrl!,
-                    width: 36,
-                    height: 36,
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) => const CircularProgressIndicator(strokeWidth: 2),
-                    errorWidget: (_, __, ___) => Text(
-                      widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : 'U',
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
-                    ),
-                  ),
-                ),
-              )
-            else
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: AppTheme.primaryLight,
-                child: Text(
-                  widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : 'U',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
-                ),
-              ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
+        title: ValueListenableBuilder<Set<String>>(
+          valueListenable: PresenceService().onlineUserIdsNotifier,
+          builder: (context, onlineIds, _) {
+            final isOnline = PresenceService().isUserOnline(widget.otherUserId, role: widget.otherUserRole);
+
+            return Row(
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    if (isAdmin)
+                      const CircleAvatar(
+                        radius: 18,
+                        backgroundColor: Color(0xFF3B82F6),
+                        child: Icon(Icons.shield, color: Colors.white, size: 20),
+                      )
+                    else if (widget.otherUserAvatarUrl != null && widget.otherUserAvatarUrl!.trim().isNotEmpty)
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: AppTheme.primaryLight,
+                        child: ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl: widget.otherUserAvatarUrl!,
+                            width: 36,
+                            height: 36,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => const CircularProgressIndicator(strokeWidth: 2),
+                            errorWidget: (_, __, ___) => Text(
+                              widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : 'U',
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: AppTheme.primaryLight,
                         child: Text(
-                          isAdmin ? 'All in One (System)' : widget.otherUserName,
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                          overflow: TextOverflow.ellipsis,
+                          widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : 'U',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
                         ),
                       ),
-                      if (isAdmin) ...[
-                        const SizedBox(width: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    if (isOnline)
+                      Positioned(
+                        bottom: -1,
+                        right: -1,
+                        child: Container(
+                          width: 11,
+                          height: 11,
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade700,
-                            borderRadius: BorderRadius.circular(4),
+                            color: const Color(0xFF10B981),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
                           ),
-                          child: const Text('ADMIN', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
                         ),
-                      ],
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              isAdmin ? 'All in One (System)' : widget.otherUserName,
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isAdmin) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade700,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text('ADMIN', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          if (isOnline) ...[
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF10B981),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Text(
+                              'Online',
+                              style: TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.w600),
+                            ),
+                            const Text('  •  ', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          ] else ...[
+                            const Text(
+                              'Offline',
+                              style: TextStyle(fontSize: 11, color: Colors.grey),
+                            ),
+                            const Text('  •  ', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          ],
+                          Flexible(
+                            child: Text(
+                              'Re: ${widget.listingTitle}',
+                              style: const TextStyle(fontSize: 11, color: AppTheme.textSecondaryLight),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
-                  Text(
-                    'Re: ${widget.listingTitle}',
-                    style: const TextStyle(fontSize: 11, color: AppTheme.textSecondaryLight),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
       ),
       body: Column(
@@ -697,12 +780,31 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                           final msg = _messages[index];
                           final isMe = msg.senderId == user?.id;
 
-                          return Align(
-                            alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                            child: GestureDetector(
-                              onLongPress: () {
-                                setState(() => _replyingToMessage = msg);
-                              },
+                          return Dismissible(
+                            key: ValueKey('msg_${msg.id}'),
+                            direction: DismissDirection.startToEnd,
+                            confirmDismiss: (direction) async {
+                              setState(() => _replyingToMessage = msg);
+                              return false; // WhatsApp style: do not remove message, just trigger reply composer
+                            },
+                            background: Container(
+                              alignment: Alignment.centerLeft,
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryColor.withOpacity(0.18),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.reply_rounded, color: AppTheme.primaryColor, size: 20),
+                              ),
+                            ),
+                            child: Align(
+                              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                              child: GestureDetector(
+                                onLongPress: () {
+                                  setState(() => _replyingToMessage = msg);
+                                },
                               child: Container(
                                 margin: const EdgeInsets.only(bottom: 10),
                                 constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
@@ -810,8 +912,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                 ),
                               ),
                             ),
-                          );
-                        },
+                          ),
+                        );
+                      },
                       ),
           ),
 

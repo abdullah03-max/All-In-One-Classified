@@ -489,6 +489,7 @@ class PushNotificationService {
             MaterialPageRoute(
               builder: (_) => ChatRoomScreen(
                 conversationId: convId,
+                otherUserId: data['sender_id'] as String?,
                 listingTitle: listingTitle,
                 otherUserName: senderName,
               ),

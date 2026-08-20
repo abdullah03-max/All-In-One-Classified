@@ -130,6 +130,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
           MaterialPageRoute(
             builder: (_) => ChatRoomScreen(
               conversationId: convId,
+              otherUserId: widget.listing.sellerId,
               listingTitle: widget.listing.title,
               otherUserName: widget.listing.seller?.fullName ?? 'Seller',
               otherUserAvatarUrl: widget.listing.seller?.avatarUrl,

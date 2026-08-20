@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../auth/presentation/login_screen.dart';
 import '../data/chat_models.dart';
 import '../data/chat_repository.dart';
+import '../services/presence_service.dart';
 import 'chat_room_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
@@ -27,6 +28,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   void initState() {
     super.initState();
+    PresenceService().init();
     _loadConversations();
     _subscribeToRealtime();
   }
@@ -166,6 +168,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             MaterialPageRoute(
                               builder: (_) => ChatRoomScreen(
                                 conversationId: conv.id,
+                                otherUserId: conv.otherUser?.id,
                                 listingTitle: conv.listingTitle ?? 'Listing',
                                 otherUserName: isSystem ? 'All in One (System)' : otherName,
                                 otherUserAvatarUrl: avatarUrl,
@@ -177,68 +180,89 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           );
                           _loadConversations();
                         },
-                        leading: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            if (isSystem)
-                              const CircleAvatar(
-                                radius: 24,
-                                backgroundColor: Color(0xFF3B82F6),
-                                child: Icon(Icons.shield, color: Colors.white, size: 24),
-                              )
-                            else if (avatarUrl != null && avatarUrl.trim().isNotEmpty)
-                              CircleAvatar(
-                                radius: 24,
-                                backgroundColor: AppTheme.primaryLight,
-                                child: ClipOval(
-                                  child: CachedNetworkImage(
-                                    imageUrl: avatarUrl,
-                                    width: 48,
-                                    height: 48,
-                                    fit: BoxFit.cover,
-                                    placeholder: (_, __) => const CircularProgressIndicator(strokeWidth: 2),
-                                    errorWidget: (_, __, ___) => Text(
+                        leading: ValueListenableBuilder<Set<String>>(
+                          valueListenable: PresenceService().onlineUserIdsNotifier,
+                          builder: (context, onlineIds, _) {
+                            final isOnline = PresenceService().isUserOnline(conv.otherUser?.id, role: conv.otherUser?.role);
+
+                            return Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                if (isSystem)
+                                  const CircleAvatar(
+                                    radius: 24,
+                                    backgroundColor: Color(0xFF3B82F6),
+                                    child: Icon(Icons.shield, color: Colors.white, size: 24),
+                                  )
+                                else if (avatarUrl != null && avatarUrl.trim().isNotEmpty)
+                                  CircleAvatar(
+                                    radius: 24,
+                                    backgroundColor: AppTheme.primaryLight,
+                                    child: ClipOval(
+                                      child: CachedNetworkImage(
+                                        imageUrl: avatarUrl,
+                                        width: 48,
+                                        height: 48,
+                                        fit: BoxFit.cover,
+                                        placeholder: (_, __) => const CircularProgressIndicator(strokeWidth: 2),
+                                        errorWidget: (_, __, ___) => Text(
+                                          otherName.isNotEmpty ? otherName[0].toUpperCase() : 'U',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  CircleAvatar(
+                                    radius: 24,
+                                    backgroundColor: AppTheme.primaryLight,
+                                    child: Text(
                                       otherName.isNotEmpty ? otherName[0].toUpperCase() : 'U',
                                       style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
                                     ),
                                   ),
-                                ),
-                              )
-                            else
-                              CircleAvatar(
-                                radius: 24,
-                                backgroundColor: AppTheme.primaryLight,
-                                child: Text(
-                                  otherName.isNotEmpty ? otherName[0].toUpperCase() : 'U',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
-                                ),
-                              ),
-                            if (conv.listingImage != null && conv.listingImage!.isNotEmpty)
-                              Positioned(
-                                bottom: -2,
-                                right: -2,
-                                child: Container(
-                                  padding: const EdgeInsets.all(1.5),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 3),
-                                    ],
-                                  ),
-                                  child: ClipOval(
-                                    child: SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CachedNetworkImage(
-                                        imageUrl: conv.listingImage!,
-                                        fit: BoxFit.cover,
+                                if (isOnline)
+                                  Positioned(
+                                    bottom: 0,
+                                    left: 0,
+                                    child: Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF10B981),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Colors.white, width: 2),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ),
-                          ],
+                                if (conv.listingImage != null && conv.listingImage!.isNotEmpty)
+                                  Positioned(
+                                    bottom: -2,
+                                    right: -2,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(1.5),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 3),
+                                        ],
+                                      ),
+                                      child: ClipOval(
+                                        child: SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CachedNetworkImage(
+                                            imageUrl: conv.listingImage!,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
                         ),
                         title: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
