@@ -12,9 +12,9 @@ const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Brand */}
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-accent-500 rounded-xl flex items-center justify-center">
-                <Package size={16} className="text-white" />
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-900 border border-slate-700/50 p-0.5 shadow-md flex items-center justify-center">
+                <img src="/logo.png" alt="All in one" className="w-full h-full object-cover rounded-lg" />
               </div>
               <span className="text-xl font-bold text-white">All in one</span>
             </div>
