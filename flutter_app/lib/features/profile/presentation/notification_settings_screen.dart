@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../notifications/services/push_notification_service.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -9,8 +9,6 @@ class NotificationSettingsScreen extends StatefulWidget {
 }
 
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
-  final SupabaseClient _client = Supabase.instance.client;
-
   bool _newMessages = true;
   bool _newOffers = true;
   bool _listingStatusChanges = true;
@@ -27,13 +25,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   }
 
   Future<void> _loadPreferences() async {
-    final user = _client.auth.currentUser;
-    if (user == null) return;
-
     try {
-      final data = await _client.from('users').select('notification_preferences').eq('id', user.id).maybeSingle();
-      if (data != null && data['notification_preferences'] != null) {
-        final prefs = data['notification_preferences'];
+      final prefs = await PushNotificationService.loadPreferences();
+      if (mounted) {
         setState(() {
           _newMessages = prefs['new_messages'] ?? true;
           _newOffers = prefs['new_offers'] ?? true;
@@ -42,18 +36,13 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           _marketingEmails = prefs['marketing_emails'] ?? false;
           _isLoading = false;
         });
-      } else {
-        setState(() => _isLoading = false);
       }
-    } catch (e) {
-      setState(() => _isLoading = false);
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _savePreferences() async {
-    final user = _client.auth.currentUser;
-    if (user == null) return;
-
     setState(() => _isSaving = true);
 
     try {
@@ -65,14 +54,15 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         'marketing_emails': _marketingEmails,
       };
 
-      await _client.from('users').update({
-        'notification_preferences': prefsPayload,
-      }).eq('id', user.id);
+      await PushNotificationService.savePreferences(prefsPayload);
 
       if (mounted) {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Notification preferences saved!'), backgroundColor: Color(0xFF10B981)),
+          const SnackBar(
+            content: Text('Notification preferences saved successfully!'),
+            backgroundColor: Color(0xFF10B981),
+          ),
         );
       }
     } catch (e) {
