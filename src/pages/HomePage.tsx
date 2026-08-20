@@ -1,7 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, TrendingUp, Shield, Zap, Star, ArrowRight, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Search,
+  TrendingUp,
+  Shield,
+  Zap,
+  Star,
+  ArrowRight,
+  MapPin,
+  ChevronLeft,
+  ChevronRight,
+  MessageSquare,
+  Sparkles,
+  CheckCircle2,
+  Tag,
+  Flame,
+  Smartphone,
+  Car,
+  Bike,
+  Home as HomeIcon,
+  Tv,
+  Briefcase,
+  Layers
+} from 'lucide-react';
 import { CITIES } from '../utils/constants';
 import { listingsService } from '../services/listingsService';
 import { categoriesService } from '../services';
@@ -12,6 +34,90 @@ import { Skeleton } from '../components/ui';
 import { formatNumber, userHasAnyRole } from '../utils/helpers';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+
+const getCategoryMeta = (name: string, index: number) => {
+  const n = name.toLowerCase();
+  if (n.includes('vehicle') || n.includes('car')) {
+    return {
+      gradient: 'from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20',
+      border: 'hover:border-blue-500/50 hover:shadow-blue-500/10',
+      iconBg: 'bg-blue-500 text-white',
+      accentColor: '#3b82f6',
+    };
+  }
+  if (n.includes('mobile') || n.includes('phone') || n.includes('tech')) {
+    return {
+      gradient: 'from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20',
+      border: 'hover:border-purple-500/50 hover:shadow-purple-500/10',
+      iconBg: 'bg-purple-500 text-white',
+      accentColor: '#a855f7',
+    };
+  }
+  if (n.includes('bike') || n.includes('motorcycle')) {
+    return {
+      gradient: 'from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/20',
+      border: 'hover:border-amber-500/50 hover:shadow-amber-500/10',
+      iconBg: 'bg-amber-500 text-white',
+      accentColor: '#f59e0b',
+    };
+  }
+  if (n.includes('property') || n.includes('house') || n.includes('rent') || n.includes('real estate')) {
+    return {
+      gradient: 'from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20',
+      border: 'hover:border-emerald-500/50 hover:shadow-emerald-500/10',
+      iconBg: 'bg-emerald-500 text-white',
+      accentColor: '#10b981',
+    };
+  }
+  if (n.includes('electronic') || n.includes('appliance')) {
+    return {
+      gradient: 'from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/20 dark:to-blue-500/20',
+      border: 'hover:border-cyan-500/50 hover:shadow-cyan-500/10',
+      iconBg: 'bg-cyan-500 text-white',
+      accentColor: '#06b6d4',
+    };
+  }
+  if (n.includes('fashion') || n.includes('beauty') || n.includes('cloth')) {
+    return {
+      gradient: 'from-rose-500/10 to-pink-500/10 dark:from-rose-500/20 dark:to-pink-500/20',
+      border: 'hover:border-rose-500/50 hover:shadow-rose-500/10',
+      iconBg: 'bg-rose-500 text-white',
+      accentColor: '#f43f5e',
+    };
+  }
+  if (n.includes('job') || n.includes('career')) {
+    return {
+      gradient: 'from-indigo-500/10 to-violet-500/10 dark:from-indigo-500/20 dark:to-violet-500/20',
+      border: 'hover:border-indigo-500/50 hover:shadow-indigo-500/10',
+      iconBg: 'bg-indigo-500 text-white',
+      accentColor: '#6366f1',
+    };
+  }
+  if (n.includes('animal') || n.includes('pet')) {
+    return {
+      gradient: 'from-orange-500/10 to-amber-500/10 dark:from-orange-500/20 dark:to-amber-500/20',
+      border: 'hover:border-orange-500/50 hover:shadow-orange-500/10',
+      iconBg: 'bg-orange-500 text-white',
+      accentColor: '#f97316',
+    };
+  }
+  if (n.includes('service')) {
+    return {
+      gradient: 'from-teal-500/10 to-emerald-500/10 dark:from-teal-500/20 dark:to-emerald-500/20',
+      border: 'hover:border-teal-500/50 hover:shadow-teal-500/10',
+      iconBg: 'bg-teal-500 text-white',
+      accentColor: '#14b8a6',
+    };
+  }
+
+  const palettes = [
+    { gradient: 'from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20', border: 'hover:border-blue-500/50', iconBg: 'bg-blue-500 text-white', accentColor: '#3b82f6' },
+    { gradient: 'from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20', border: 'hover:border-purple-500/50', iconBg: 'bg-purple-500 text-white', accentColor: '#a855f7' },
+    { gradient: 'from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20', border: 'hover:border-emerald-500/50', iconBg: 'bg-emerald-500 text-white', accentColor: '#10b981' },
+    { gradient: 'from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/20', border: 'hover:border-amber-500/50', iconBg: 'bg-amber-500 text-white', accentColor: '#f59e0b' },
+  ];
+  return palettes[index % palettes.length];
+};
 
 const CategorySection: React.FC<{
   category: Category;
@@ -26,7 +132,7 @@ const CategorySection: React.FC<{
       const scrollAmount = clientWidth * 0.75;
       scrollRef.current.scrollTo({
         left: direction === 'left' ? scrollLeft - scrollAmount : scrollLeft + scrollAmount,
-        behavior: 'smooth'
+        behavior: 'smooth',
       });
     }
   };
@@ -34,22 +140,27 @@ const CategorySection: React.FC<{
   if (!isLoading && listings.length === 0) return null;
 
   return (
-    <section className="max-w-7xl mx-auto px-4 py-8 border-b border-slate-100 dark:border-slate-800 last:border-0 relative group">
-      <div className="flex items-center justify-between mb-6">
+    <section className="py-8 relative group">
+      <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
-          {category.icon && (
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: (category.color || '#3b82f6') + '20' }}
-            >
-              <Icon name={category.icon} size={20} style={{ color: category.color || '#3b82f6' }} />
-            </div>
-          )}
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{category.name}</h2>
+          <div
+            className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm"
+            style={{ backgroundColor: (category.color || '#3b82f6') + '25' }}
+          >
+            <Icon name={category.icon || 'Tag'} size={20} style={{ color: category.color || '#3b82f6' }} />
+          </div>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+              {category.name}
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Explore verified ads in {category.name}
+            </p>
+          </div>
         </div>
         <Link
           to={`/category/${category.slug}`}
-          className="text-sm font-semibold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1"
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors"
         >
           View all <ArrowRight size={14} />
         </Link>
@@ -57,19 +168,21 @@ const CategorySection: React.FC<{
 
       <div className="relative">
         {/* Scroll Buttons */}
-        {!isLoading && listings.length > 0 && (
+        {!isLoading && listings.length > 3 && (
           <>
             <button
               onClick={() => scroll('left')}
-              className="absolute -left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-md border border-slate-100 dark:border-slate-700 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-50 dark:hover:bg-slate-700"
+              className="absolute -left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-white dark:bg-slate-800 shadow-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-50 dark:hover:bg-slate-700 hover:scale-110 active:scale-95"
+              aria-label="Scroll left"
             >
-              <ChevronLeft size={20} className="text-slate-600 dark:text-slate-300" />
+              <ChevronLeft size={18} className="text-slate-700 dark:text-slate-200" />
             </button>
             <button
               onClick={() => scroll('right')}
-              className="absolute -right-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-md border border-slate-100 dark:border-slate-700 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-50 dark:hover:bg-slate-700"
+              className="absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-white dark:bg-slate-800 shadow-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-50 dark:hover:bg-slate-700 hover:scale-110 active:scale-95"
+              aria-label="Scroll right"
             >
-              <ChevronRight size={20} className="text-slate-600 dark:text-slate-300" />
+              <ChevronRight size={18} className="text-slate-700 dark:text-slate-200" />
             </button>
           </>
         )}
@@ -81,22 +194,22 @@ const CategorySection: React.FC<{
         >
           {isLoading
             ? Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="w-64 shrink-0 snap-start">
-                <div className="card overflow-hidden">
-                  <Skeleton className="h-40 rounded-t-2xl rounded-b-none" />
-                  <div className="p-3 space-y-2">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-2/3" />
-                    <Skeleton className="h-3 w-1/2" />
+                <div key={i} className="w-60 sm:w-64 shrink-0 snap-start">
+                  <div className="card overflow-hidden">
+                    <Skeleton className="h-40 rounded-t-2xl rounded-b-none" />
+                    <div className="p-3 space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              ))
             : listings.map(listing => (
-              <div key={listing.id} className="w-64 shrink-0 snap-start">
-                <ListingCard listing={listing} />
-              </div>
-            ))}
+                <div key={listing.id} className="w-60 sm:w-64 shrink-0 snap-start">
+                  <ListingCard listing={listing} />
+                </div>
+              ))}
         </div>
       </div>
     </section>
@@ -132,21 +245,23 @@ const HomePage: React.FC = () => {
     }
 
     const loadData = () => {
-      listingsService.getFeaturedListings()
+      listingsService
+        .getFeaturedListings()
         .then(setFeaturedListings)
         .catch(console.error)
         .finally(() => setLoadingFeatured(false));
 
-      categoriesService.getCategories()
+      categoriesService
+        .getCategories()
         .then(allCats => {
           const mainCats = allCats.filter(c => !c.parent_id);
           setCategories(mainCats);
           setLoadingCategories(false);
 
-          // Fetch listings for each main category (up to 12 items, premium first)
           mainCats.forEach(cat => {
             setLoadingListings(prev => ({ ...prev, [cat.id]: true }));
-            listingsService.getCategoryListingsHome(cat.id, 12)
+            listingsService
+              .getCategoryListingsHome(cat.id, 12)
               .then(listings => {
                 setListingsByCategory(prev => ({ ...prev, [cat.id]: listings }));
               })
@@ -185,77 +300,106 @@ const HomePage: React.FC = () => {
     navigate(`/listings?${params.toString()}`);
   };
 
-  const stats = [
-    { label: 'Active Listings', value: formatNumber(50000), icon: TrendingUp, color: 'text-blue-600' },
-    { label: 'Verified Sellers', value: formatNumber(12000), icon: Shield, color: 'text-green-600' },
-    { label: 'Cities Covered', value: '20+', icon: MapPin, color: 'text-purple-600' },
-    { label: 'Daily Transactions', value: formatNumber(5000), icon: Zap, color: 'text-amber-600' },
+  const quickPills = [
+    { label: 'Mobile Phones', icon: Smartphone, query: 'Mobile Phones' },
+    { label: 'Cars', icon: Car, query: 'Cars' },
+    { label: 'Bikes', icon: Bike, query: 'Bikes' },
+    { label: 'Property', icon: HomeIcon, query: 'Property for Sale' },
+    { label: 'Electronics', icon: Tv, query: 'Electronics' },
+    { label: 'Jobs', icon: Briefcase, query: 'Jobs' },
   ];
 
   return (
-    <div>
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
-          <div className="absolute bottom-0 right-0 w-80 h-80 bg-white rounded-full translate-x-1/2 translate-y-1/2" />
-        </div>
-        <div className="relative max-w-5xl mx-auto px-4 py-20 text-center">
+    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950">
+      {/* ── 1. MODERN MESH GRADIENT HERO SECTION ── */}
+      <section className="relative overflow-hidden pt-12 pb-20 lg:pt-16 lg:pb-28 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
+        {/* Ambient Glows */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-primary-600/25 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute top-10 right-10 w-72 h-72 bg-accent-500/20 blur-[100px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-0 left-10 w-80 h-80 bg-indigo-500/15 blur-[100px] rounded-full pointer-events-none" />
+
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 text-center">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.5 }}
           >
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 text-white text-sm px-4 py-1.5 rounded-full mb-6">
-              <Star size={14} className="text-amber-400" />
-              Pakistan's #1 Online Marketplace
+            {/* Top Pill Tag */}
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-semibold text-slate-200 mb-6 shadow-inner">
+              <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              Pakistan's #1 Verified Marketplace
+              <Star size={13} className="text-amber-400 fill-amber-400 ml-0.5" />
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 leading-tight">
-              Buy & Sell
-              <span className="text-accent-300"> Anything</span>
-              <br />Across Pakistan
+
+            {/* Headline */}
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white mb-4 leading-tight sm:leading-none">
+              Buy, Sell & Discover
+              <br />
+              <span className="bg-gradient-to-r from-blue-400 via-indigo-300 to-amber-300 bg-clip-text text-transparent">
+                Everything Across Pakistan
+              </span>
             </h1>
-            <p className="text-primary-200 text-lg mb-8 max-w-2xl mx-auto">
-              From mobile & tech products to real estate, vehicles to fashion — discover amazing deals or post your own free ad today.
+
+            <p className="text-slate-300 text-sm sm:text-base lg:text-lg mb-8 max-w-2xl mx-auto font-normal leading-relaxed">
+              Connect directly with verified sellers in your city. Safe chat, verified listings, and 0% commission.
             </p>
 
-            {/* Search Bar */}
-            <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto">
-              <div className="flex-1 relative">
-                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            {/* Glassmorphic Search Bar */}
+            <form
+              onSubmit={handleSearch}
+              className="p-2 sm:p-2.5 bg-white/10 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20 dark:border-slate-700/60 rounded-3xl shadow-2xl max-w-3xl mx-auto flex flex-col sm:flex-row gap-2"
+            >
+              <div className="flex-1 relative flex items-center">
+                <Search size={20} className="absolute left-4 text-slate-400" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="What are you looking for?"
-                  className="w-full pl-11 pr-4 py-4 rounded-2xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-400 text-base"
+                  placeholder="Find Mobiles, Cars, Bikes, Laptops, Houses..."
+                  className="w-full pl-12 pr-4 py-3.5 bg-white/90 dark:bg-slate-800/90 text-slate-900 dark:text-slate-100 placeholder-slate-400 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-medium transition-all"
                 />
               </div>
-              <select
-                value={selectedCity}
-                onChange={e => setSelectedCity(e.target.value)}
-                className="px-4 py-4 rounded-2xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-accent-400 sm:w-40 bg-white"
-              >
-                <option value="">All Cities</option>
-                {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+
+              <div className="sm:w-48 relative flex items-center">
+                <MapPin size={18} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                <select
+                  value={selectedCity}
+                  onChange={e => setSelectedCity(e.target.value)}
+                  className="w-full pl-10 pr-8 py-3.5 bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-medium transition-all appearance-none cursor-pointer"
+                >
+                  <option value="">All Pakistan</option>
+                  {CITIES.map(c => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-3 pointer-events-none text-slate-400 text-xs">▼</div>
+              </div>
+
               <button
                 type="submit"
-                className="px-8 py-4 bg-accent-500 hover:bg-accent-600 text-white font-semibold rounded-2xl transition-colors whitespace-nowrap"
+                className="px-8 py-3.5 bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-500 hover:to-indigo-500 text-white font-bold text-sm rounded-2xl shadow-lg shadow-primary-600/30 hover:shadow-primary-600/50 hover:scale-[1.02] active:scale-95 transition-all whitespace-nowrap flex items-center justify-center gap-2"
               >
-                Search
+                <Search size={16} />
+                Search Ads
               </button>
             </form>
 
-            {/* Quick category pills */}
+            {/* Quick Category Suggestion Pills */}
             <div className="flex flex-wrap justify-center gap-2 mt-6">
-              {['Cars', 'Mobile Phones', 'Property for Sale', 'Property for Rent', 'Electronics & Home Appliances', 'Jobs'].map(cat => (
+              {quickPills.map(item => (
                 <button
-                  key={cat}
-                  onClick={() => setSearchQuery(cat)}
-                  className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs rounded-full border border-white/20 transition-colors"
+                  key={item.label}
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery(item.query);
+                    navigate(`/listings?q=${encodeURIComponent(item.query)}`);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/15 backdrop-blur-md border border-white/10 hover:border-white/30 text-slate-300 hover:text-white text-xs font-medium transition-all"
                 >
-                  {cat}
+                  <item.icon size={13} className="text-primary-400" />
+                  {item.label}
                 </button>
               ))}
             </div>
@@ -263,147 +407,283 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-        <div className="max-w-5xl mx-auto px-4 py-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {stats.map((stat, i) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="flex flex-col items-center text-center"
-              >
-                <stat.icon size={22} className={`${stat.color} mb-1`} />
-                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{stat.value}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{stat.label}</p>
-              </motion.div>
-            ))}
+      {/* ── 2. TRUST STATS HIGHLIGHT STRIP ── */}
+      <div className="max-w-6xl mx-auto px-4 -mt-8 relative z-10">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl backdrop-blur-lg">
+          <div className="flex items-center gap-3 p-2">
+            <div className="w-11 h-11 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <TrendingUp size={22} />
+            </div>
+            <div>
+              <p className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-slate-100">50,000+</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Live Active Ads</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-2">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <Shield size={22} />
+            </div>
+            <div>
+              <p className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-slate-100">100%</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Verified Sellers</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-2">
+            <div className="w-11 h-11 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+              <MapPin size={22} />
+            </div>
+            <div>
+              <p className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-slate-100">30+ Cities</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Nationwide Reach</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-2">
+            <div className="w-11 h-11 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <Zap size={22} />
+            </div>
+            <div>
+              <p className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-slate-100">Instant</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Direct Chat & Offers</p>
+            </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* Categories Grid */}
-      <section className="max-w-7xl mx-auto px-4 py-10">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Browse Categories</h2>
-          <Link to="/listings" className="text-sm text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1">
-            View all <ArrowRight size={14} />
-          </Link>
-        </div>
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-3">
-          {loadingCategories
-            ? Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="flex flex-col items-center p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
-                <Skeleton className="w-12 h-12 rounded-xl mb-2" />
-                <Skeleton className="h-3 w-16" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* ── 3. EXPLORE CATEGORIES (MODERN INTERACTIVE CARDS) ── */}
+        <section className="mb-14">
+          <div className="flex items-end justify-between mb-6">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary-600 dark:text-primary-400 mb-1">
+                <Layers size={14} /> Popular Categories
               </div>
-            ))
-            : categories.map((cat, i) => (
-              <motion.div
-                key={cat.id}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04 }}
-              >
-                <Link
-                  to={`/category/${cat.slug}`}
-                  className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-md transition-all group"
-                >
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform"
-                    style={{ backgroundColor: (cat.color || '#3b82f6') + '20' }}
-                  >
-                    <Icon name={cat.icon} size={24} style={{ color: cat.color || '#3b82f6' }} />
-                  </div>
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300 text-center leading-tight">{cat.name}</span>
-                </Link>
-              </motion.div>
-            ))}
-        </div>
-      </section>
-
-      {/* Featured Listings */}
-      {(loadingFeatured || featuredListings.length > 0) && (
-        <section className="max-w-7xl mx-auto px-4 py-6 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <Star size={20} className="text-accent-500" />
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Featured Listings</h2>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+                Explore by Category
+              </h2>
             </div>
-            <Link to="/listings?featured=true" className="text-sm text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1">
-              View all <ArrowRight size={14} />
+            <Link
+              to="/listings"
+              className="text-xs sm:text-sm font-bold text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 flex items-center gap-1.5"
+            >
+              All Categories <ArrowRight size={15} />
             </Link>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {loadingFeatured
-              ? Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="card overflow-hidden">
-                  <Skeleton className="h-40 rounded-t-2xl rounded-b-none" />
-                  <div className="p-3 space-y-2">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-2/3" />
-                    <Skeleton className="h-3 w-1/2" />
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-4">
+            {loadingCategories
+              ? Array.from({ length: 7 }).map((_, i) => (
+                  <div key={i} className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex flex-col items-center">
+                    <Skeleton className="w-12 h-12 rounded-2xl mb-3" />
+                    <Skeleton className="h-4 w-20 mb-1" />
+                    <Skeleton className="h-3 w-12" />
                   </div>
-                </div>
-              ))
-              : featuredListings.slice(0, 12).map(listing => (
-                <ListingCard key={listing.id} listing={listing} />
-              ))}
+                ))
+              : categories.map((cat, i) => {
+                  const meta = getCategoryMeta(cat.name, i);
+                  return (
+                    <motion.div
+                      key={cat.id}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.03 }}
+                    >
+                      <Link
+                        to={`/category/${cat.slug}`}
+                        className={`group relative flex flex-col items-center justify-center p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 ${meta.border} hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden text-center`}
+                      >
+                        {/* Background Tint on Hover */}
+                        <div className={`absolute inset-0 bg-gradient-to-br ${meta.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+
+                        {/* Icon Container */}
+                        <div
+                          className={`relative w-13 h-13 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shadow-md mb-3 group-hover:scale-110 transition-transform duration-300`}
+                          style={{
+                            background: `linear-gradient(135deg, ${cat.color || meta.accentColor}, ${cat.color || meta.accentColor}dd)`,
+                          }}
+                        >
+                          <Icon name={cat.icon || 'Tag'} size={24} className="text-white" />
+                        </div>
+
+                        {/* Category Name */}
+                        <span className="relative text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors line-clamp-1 leading-tight">
+                          {cat.name}
+                        </span>
+
+                        <span className="relative text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 group-hover:text-slate-600 dark:group-hover:text-slate-300">
+                          Explore Ads
+                        </span>
+                      </Link>
+                    </motion.div>
+                  );
+                })}
           </div>
         </section>
-      )}
 
-      {/* Category-wise Sections */}
-      {loadingCategories
-        ? Array.from({ length: 3 }).map((_, i) => (
-          <section key={i} className="max-w-7xl mx-auto px-4 py-8 border-b border-slate-100 dark:border-slate-800">
+        {/* ── 4. FEATURED & PROMOTED LISTINGS (GOLD ACCENT CAROUSEL) ── */}
+        {(loadingFeatured || featuredListings.length > 0) && (
+          <section className="mb-14 p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-amber-500/5 via-orange-500/5 to-transparent border border-amber-500/20 dark:border-amber-500/15 relative overflow-hidden">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <Skeleton className="w-10 h-10 rounded-xl" />
-                <Skeleton className="h-6 w-32" />
-              </div>
-              <Skeleton className="h-4 w-16" />
-            </div>
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-none">
-              {Array.from({ length: 4 }).map((_, j) => (
-                <div key={j} className="w-64 shrink-0">
-                  <div className="card overflow-hidden">
-                    <Skeleton className="h-40 rounded-t-2xl rounded-b-none" />
-                    <div className="p-3 space-y-2">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-2/3" />
-                      <Skeleton className="h-3 w-1/2" />
-                    </div>
-                  </div>
+                <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/30">
+                  <Flame size={22} />
                 </div>
-              ))}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+                      Featured & Trending Deals
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-700 dark:text-amber-400 text-[10px] font-black uppercase tracking-wider">
+                      Hot
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Handpicked verified listings with top buyer interest
+                  </p>
+                </div>
+              </div>
+
+              <Link
+                to="/listings?featured=true"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+              >
+                View all featured <ArrowRight size={14} />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {loadingFeatured
+                ? Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="card overflow-hidden">
+                      <Skeleton className="h-40 rounded-t-2xl rounded-b-none" />
+                      <div className="p-3 space-y-2">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-2/3" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
+                    </div>
+                  ))
+                : featuredListings.slice(0, 12).map(listing => (
+                    <ListingCard key={listing.id} listing={listing} />
+                  ))}
             </div>
           </section>
-        ))
-        : categories.map(cat => (
-          <CategorySection
-            key={cat.id}
-            category={cat}
-            listings={listingsByCategory[cat.id] || []}
-            isLoading={loadingListings[cat.id]}
-          />
-        ))}
+        )}
 
-      {/* CTA Banner */}
-      <section className="bg-gradient-to-r from-accent-500 to-accent-600">
-        <div className="max-w-4xl mx-auto px-4 py-12 text-center">
-          <h2 className="text-3xl font-bold text-white mb-3">Ready to Sell?</h2>
-          <p className="text-accent-100 mb-6 text-lg">Post your first ad for free and reach thousands of buyers today.</p>
-          <Link
-            to={user ? '/dashboard/listings/new' : '/register'}
-            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-accent-600 font-bold rounded-2xl hover:bg-accent-50 transition-colors shadow-lg"
-          >
-            Post Free Ad <ArrowRight size={18} />
-          </Link>
+        {/* ── 5. CATEGORY-WISE SECTIONS (ROW BY ROW) ── */}
+        <div className="space-y-4">
+          {loadingCategories
+            ? Array.from({ length: 3 }).map((_, i) => (
+                <section key={i} className="py-8 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="w-10 h-10 rounded-2xl" />
+                      <Skeleton className="h-6 w-32" />
+                    </div>
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-none">
+                    {Array.from({ length: 4 }).map((_, j) => (
+                      <div key={j} className="w-64 shrink-0">
+                        <div className="card overflow-hidden">
+                          <Skeleton className="h-40 rounded-t-2xl rounded-b-none" />
+                          <div className="p-3 space-y-2">
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-2/3" />
+                            <Skeleton className="h-3 w-1/2" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))
+            : categories.map(cat => (
+                <CategorySection
+                  key={cat.id}
+                  category={cat}
+                  listings={listingsByCategory[cat.id] || []}
+                  isLoading={loadingListings[cat.id]}
+                />
+              ))}
         </div>
-      </section>
+
+        {/* ── 6. WHY CHOOSE ALL IN ONE FEATURE HIGHLIGHTS ── */}
+        <section className="my-16 p-8 sm:p-12 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xl relative overflow-hidden">
+          <div className="text-center max-w-2xl mx-auto mb-10">
+            <span className="text-xs font-bold uppercase tracking-wider text-primary-600 dark:text-primary-400">
+              Why All In One Marketplace
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight mt-1">
+              Built for Fast, Secure Local Trading
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
+              <div className="w-12 h-12 rounded-2xl bg-blue-500 text-white flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
+                <Shield size={24} />
+              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-2">Verified Sellers & Ads</h3>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                All ads pass moderator approval and users are phone-verified for genuine, scam-free transactions.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/20">
+                <MessageSquare size={24} />
+              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-2">WhatsApp-Style SafeChat</h3>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                Negotiate prices, exchange voice notes, and receive instant push notifications without sharing your personal number.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
+              <div className="w-12 h-12 rounded-2xl bg-purple-500 text-white flex items-center justify-center mb-4 shadow-lg shadow-purple-500/20">
+                <Sparkles size={24} />
+              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-2">Smart AI Assistance</h3>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                Get instant price evaluations, smart recommendations, and 24/7 AI-guided buying assistance.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ── 7. POST AD PROMO HERO BANNER (CTA) ── */}
+        <section className="relative rounded-3xl bg-gradient-to-r from-primary-600 via-indigo-600 to-purple-700 text-white p-8 sm:p-12 overflow-hidden shadow-2xl">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative max-w-2xl">
+            <span className="inline-block px-3 py-1 rounded-full bg-white/20 text-xs font-bold uppercase tracking-wider mb-3">
+              100% Free Forever
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-black mb-3 leading-tight">
+              Have something to sell? Post your ad in 60 seconds!
+            </h2>
+            <p className="text-primary-100 text-sm sm:text-base mb-6 font-normal">
+              Reach thousands of buyers across Pakistan with photos, product videos, and direct customer chats.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                to={user ? '/dashboard/listings/new' : '/register'}
+                className="inline-flex items-center gap-2 px-6 py-3.5 bg-white text-primary-700 hover:bg-slate-100 font-extrabold text-sm rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all"
+              >
+                Post Free Ad Now <ArrowRight size={16} />
+              </Link>
+              <Link
+                to="/listings"
+                className="inline-flex items-center gap-2 px-6 py-3.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-sm rounded-2xl backdrop-blur-md transition-all"
+              >
+                Browse All Deals
+              </Link>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   );
 };
