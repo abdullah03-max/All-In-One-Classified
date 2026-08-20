@@ -13,8 +13,6 @@ import {
   ChevronRight,
   MessageSquare,
   Sparkles,
-  CheckCircle2,
-  Tag,
   Flame,
   Smartphone,
   Car,
@@ -31,7 +29,7 @@ import { Listing, Category } from '../types';
 import ListingCard from '../components/listings/ListingCard';
 import Icon from '../components/ui/Icon';
 import { Skeleton } from '../components/ui';
-import { formatNumber, userHasAnyRole } from '../utils/helpers';
+import { userHasAnyRole } from '../utils/helpers';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
@@ -41,7 +39,7 @@ const getCategoryMeta = (name: string, index: number) => {
     return {
       gradient: 'from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20',
       border: 'hover:border-blue-500/50 hover:shadow-blue-500/10',
-      iconBg: 'bg-blue-500 text-white',
+      iconBg: 'from-blue-500 to-indigo-600',
       accentColor: '#3b82f6',
     };
   }
@@ -49,7 +47,7 @@ const getCategoryMeta = (name: string, index: number) => {
     return {
       gradient: 'from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20',
       border: 'hover:border-purple-500/50 hover:shadow-purple-500/10',
-      iconBg: 'bg-purple-500 text-white',
+      iconBg: 'from-purple-500 to-pink-600',
       accentColor: '#a855f7',
     };
   }
@@ -57,7 +55,7 @@ const getCategoryMeta = (name: string, index: number) => {
     return {
       gradient: 'from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/20',
       border: 'hover:border-amber-500/50 hover:shadow-amber-500/10',
-      iconBg: 'bg-amber-500 text-white',
+      iconBg: 'from-amber-500 to-orange-600',
       accentColor: '#f59e0b',
     };
   }
@@ -65,7 +63,7 @@ const getCategoryMeta = (name: string, index: number) => {
     return {
       gradient: 'from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20',
       border: 'hover:border-emerald-500/50 hover:shadow-emerald-500/10',
-      iconBg: 'bg-emerald-500 text-white',
+      iconBg: 'from-emerald-500 to-teal-600',
       accentColor: '#10b981',
     };
   }
@@ -73,7 +71,7 @@ const getCategoryMeta = (name: string, index: number) => {
     return {
       gradient: 'from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/20 dark:to-blue-500/20',
       border: 'hover:border-cyan-500/50 hover:shadow-cyan-500/10',
-      iconBg: 'bg-cyan-500 text-white',
+      iconBg: 'from-cyan-500 to-blue-600',
       accentColor: '#06b6d4',
     };
   }
@@ -81,7 +79,7 @@ const getCategoryMeta = (name: string, index: number) => {
     return {
       gradient: 'from-rose-500/10 to-pink-500/10 dark:from-rose-500/20 dark:to-pink-500/20',
       border: 'hover:border-rose-500/50 hover:shadow-rose-500/10',
-      iconBg: 'bg-rose-500 text-white',
+      iconBg: 'from-rose-500 to-pink-600',
       accentColor: '#f43f5e',
     };
   }
@@ -89,7 +87,7 @@ const getCategoryMeta = (name: string, index: number) => {
     return {
       gradient: 'from-indigo-500/10 to-violet-500/10 dark:from-indigo-500/20 dark:to-violet-500/20',
       border: 'hover:border-indigo-500/50 hover:shadow-indigo-500/10',
-      iconBg: 'bg-indigo-500 text-white',
+      iconBg: 'from-indigo-500 to-violet-600',
       accentColor: '#6366f1',
     };
   }
@@ -97,7 +95,7 @@ const getCategoryMeta = (name: string, index: number) => {
     return {
       gradient: 'from-orange-500/10 to-amber-500/10 dark:from-orange-500/20 dark:to-amber-500/20',
       border: 'hover:border-orange-500/50 hover:shadow-orange-500/10',
-      iconBg: 'bg-orange-500 text-white',
+      iconBg: 'from-orange-500 to-amber-600',
       accentColor: '#f97316',
     };
   }
@@ -105,16 +103,16 @@ const getCategoryMeta = (name: string, index: number) => {
     return {
       gradient: 'from-teal-500/10 to-emerald-500/10 dark:from-teal-500/20 dark:to-emerald-500/20',
       border: 'hover:border-teal-500/50 hover:shadow-teal-500/10',
-      iconBg: 'bg-teal-500 text-white',
+      iconBg: 'from-teal-500 to-emerald-600',
       accentColor: '#14b8a6',
     };
   }
 
   const palettes = [
-    { gradient: 'from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20', border: 'hover:border-blue-500/50', iconBg: 'bg-blue-500 text-white', accentColor: '#3b82f6' },
-    { gradient: 'from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20', border: 'hover:border-purple-500/50', iconBg: 'bg-purple-500 text-white', accentColor: '#a855f7' },
-    { gradient: 'from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20', border: 'hover:border-emerald-500/50', iconBg: 'bg-emerald-500 text-white', accentColor: '#10b981' },
-    { gradient: 'from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/20', border: 'hover:border-amber-500/50', iconBg: 'bg-amber-500 text-white', accentColor: '#f59e0b' },
+    { gradient: 'from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20', border: 'hover:border-blue-500/50', iconBg: 'from-blue-500 to-indigo-600', accentColor: '#3b82f6' },
+    { gradient: 'from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20', border: 'hover:border-purple-500/50', iconBg: 'from-purple-500 to-pink-600', accentColor: '#a855f7' },
+    { gradient: 'from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20', border: 'hover:border-emerald-500/50', iconBg: 'from-emerald-500 to-teal-600', accentColor: '#10b981' },
+    { gradient: 'from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/20', border: 'hover:border-amber-500/50', iconBg: 'from-amber-500 to-orange-600', accentColor: '#f59e0b' },
   ];
   return palettes[index % palettes.length];
 };
@@ -310,13 +308,14 @@ const HomePage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950">
-      {/* ── 1. MODERN MESH GRADIENT HERO SECTION ── */}
-      <section className="relative overflow-hidden pt-12 pb-20 lg:pt-16 lg:pb-28 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
-        {/* Ambient Glows */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-primary-600/25 blur-[120px] rounded-full pointer-events-none" />
-        <div className="absolute top-10 right-10 w-72 h-72 bg-accent-500/20 blur-[100px] rounded-full pointer-events-none" />
-        <div className="absolute bottom-0 left-10 w-80 h-80 bg-indigo-500/15 blur-[100px] rounded-full pointer-events-none" />
+    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 transition-colors duration-200">
+      {/* ── 1. MODERN THEME-RESPONSIVE HERO SECTION (LIGHT & DARK ADAPTIVE) ── */}
+      <section className="relative overflow-hidden pt-12 pb-20 lg:pt-16 lg:pb-28 bg-gradient-to-b from-blue-50/70 via-indigo-50/30 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b border-slate-200/60 dark:border-slate-800/80">
+        
+        {/* Luminous Ambient Glows for Light & Dark Mode */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[360px] bg-blue-500/10 dark:bg-primary-600/25 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute top-10 right-10 w-72 h-72 bg-amber-400/15 dark:bg-accent-500/20 blur-[100px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-0 left-10 w-80 h-80 bg-indigo-500/10 dark:bg-indigo-500/15 blur-[100px] rounded-full pointer-events-none" />
 
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 text-center">
           <motion.div
@@ -325,29 +324,29 @@ const HomePage: React.FC = () => {
             transition={{ duration: 0.5 }}
           >
             {/* Top Pill Tag */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-semibold text-slate-200 mb-6 shadow-inner">
-              <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/80 dark:bg-white/10 backdrop-blur-md border border-slate-200/80 dark:border-white/15 text-xs font-bold text-slate-700 dark:text-slate-200 mb-6 shadow-sm">
+              <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               Pakistan's #1 Verified Marketplace
-              <Star size={13} className="text-amber-400 fill-amber-400 ml-0.5" />
+              <Star size={13} className="text-amber-500 fill-amber-500 ml-0.5" />
             </div>
 
             {/* Headline */}
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white mb-4 leading-tight sm:leading-none">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 dark:text-white mb-4 leading-tight sm:leading-none">
               Buy, Sell & Discover
               <br />
-              <span className="bg-gradient-to-r from-blue-400 via-indigo-300 to-amber-300 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-primary-600 via-indigo-600 to-amber-600 dark:from-blue-400 dark:via-indigo-300 dark:to-amber-300 bg-clip-text text-transparent">
                 Everything Across Pakistan
               </span>
             </h1>
 
-            <p className="text-slate-300 text-sm sm:text-base lg:text-lg mb-8 max-w-2xl mx-auto font-normal leading-relaxed">
+            <p className="text-slate-600 dark:text-slate-300 text-sm sm:text-base lg:text-lg mb-8 max-w-2xl mx-auto font-normal leading-relaxed">
               Connect directly with verified sellers in your city. Safe chat, verified listings, and 0% commission.
             </p>
 
             {/* Glassmorphic Search Bar */}
             <form
               onSubmit={handleSearch}
-              className="p-2 sm:p-2.5 bg-white/10 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20 dark:border-slate-700/60 rounded-3xl shadow-2xl max-w-3xl mx-auto flex flex-col sm:flex-row gap-2"
+              className="p-2 sm:p-2.5 bg-white/90 dark:bg-slate-900/80 backdrop-blur-2xl border border-slate-200/90 dark:border-slate-700/60 rounded-3xl shadow-xl shadow-slate-200/60 dark:shadow-2xl max-w-3xl mx-auto flex flex-col sm:flex-row gap-2"
             >
               <div className="flex-1 relative flex items-center">
                 <Search size={20} className="absolute left-4 text-slate-400" />
@@ -356,7 +355,7 @@ const HomePage: React.FC = () => {
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="Find Mobiles, Cars, Bikes, Laptops, Houses..."
-                  className="w-full pl-12 pr-4 py-3.5 bg-white/90 dark:bg-slate-800/90 text-slate-900 dark:text-slate-100 placeholder-slate-400 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-medium transition-all"
+                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50/90 dark:bg-slate-800/90 border border-slate-200/70 dark:border-transparent text-slate-900 dark:text-slate-100 placeholder-slate-400 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white dark:focus:bg-slate-800 text-sm font-medium transition-all"
                 />
               </div>
 
@@ -365,7 +364,7 @@ const HomePage: React.FC = () => {
                 <select
                   value={selectedCity}
                   onChange={e => setSelectedCity(e.target.value)}
-                  className="w-full pl-10 pr-8 py-3.5 bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-medium transition-all appearance-none cursor-pointer"
+                  className="w-full pl-10 pr-8 py-3.5 bg-slate-50/90 dark:bg-slate-800/90 border border-slate-200/70 dark:border-transparent text-slate-800 dark:text-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white dark:focus:bg-slate-800 text-sm font-medium transition-all appearance-none cursor-pointer"
                 >
                   <option value="">All Pakistan</option>
                   {CITIES.map(c => (
@@ -396,9 +395,9 @@ const HomePage: React.FC = () => {
                     setSearchQuery(item.query);
                     navigate(`/listings?q=${encodeURIComponent(item.query)}`);
                   }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/15 backdrop-blur-md border border-white/10 hover:border-white/30 text-slate-300 hover:text-white text-xs font-medium transition-all"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/15 backdrop-blur-md border border-slate-200/90 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-primary-600 dark:hover:text-white text-xs font-semibold shadow-sm transition-all"
                 >
-                  <item.icon size={13} className="text-primary-400" />
+                  <item.icon size={13} className="text-primary-500 dark:text-primary-400" />
                   {item.label}
                 </button>
               ))}
@@ -409,7 +408,7 @@ const HomePage: React.FC = () => {
 
       {/* ── 2. TRUST STATS HIGHLIGHT STRIP ── */}
       <div className="max-w-6xl mx-auto px-4 -mt-8 relative z-10">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl backdrop-blur-lg">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl shadow-slate-200/50 dark:shadow-2xl backdrop-blur-lg">
           <div className="flex items-center gap-3 p-2">
             <div className="w-11 h-11 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
               <TrendingUp size={22} />
@@ -453,7 +452,7 @@ const HomePage: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* ── 3. EXPLORE CATEGORIES (MODERN INTERACTIVE CARDS) ── */}
+        {/* ── 3. EXPLORE CATEGORIES (LIGHT & DARK ADAPTIVE CARDS) ── */}
         <section className="mb-14">
           <div className="flex items-end justify-between mb-6">
             <div>
@@ -492,7 +491,7 @@ const HomePage: React.FC = () => {
                     >
                       <Link
                         to={`/category/${cat.slug}`}
-                        className={`group relative flex flex-col items-center justify-center p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 ${meta.border} hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden text-center`}
+                        className={`group relative flex flex-col items-center justify-center p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 ${meta.border} hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none hover:-translate-y-1 transition-all duration-300 overflow-hidden text-center shadow-sm`}
                       >
                         {/* Background Tint on Hover */}
                         <div className={`absolute inset-0 bg-gradient-to-br ${meta.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
@@ -524,10 +523,10 @@ const HomePage: React.FC = () => {
 
         {/* ── 4. FEATURED & PROMOTED LISTINGS (GOLD ACCENT CAROUSEL) ── */}
         {(loadingFeatured || featuredListings.length > 0) && (
-          <section className="mb-14 p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-amber-500/5 via-orange-500/5 to-transparent border border-amber-500/20 dark:border-amber-500/15 relative overflow-hidden">
+          <section className="mb-14 p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-slate-50/50 dark:from-amber-500/5 dark:via-orange-500/5 dark:to-transparent border border-amber-500/25 dark:border-amber-500/15 relative overflow-hidden shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/30">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md shadow-amber-500/30">
                   <Flame size={22} />
                 </div>
                 <div>
@@ -576,7 +575,7 @@ const HomePage: React.FC = () => {
         <div className="space-y-4">
           {loadingCategories
             ? Array.from({ length: 3 }).map((_, i) => (
-                <section key={i} className="py-8 border-b border-slate-100 dark:border-slate-800">
+                <section key={i} className="py-8 border-b border-slate-200/80 dark:border-slate-800">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                       <Skeleton className="w-10 h-10 rounded-2xl" />
@@ -611,7 +610,7 @@ const HomePage: React.FC = () => {
         </div>
 
         {/* ── 6. WHY CHOOSE ALL IN ONE FEATURE HIGHLIGHTS ── */}
-        <section className="my-16 p-8 sm:p-12 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xl relative overflow-hidden">
+        <section className="my-16 p-8 sm:p-12 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xl shadow-slate-200/40 dark:shadow-none relative overflow-hidden">
           <div className="text-center max-w-2xl mx-auto mb-10">
             <span className="text-xs font-bold uppercase tracking-wider text-primary-600 dark:text-primary-400">
               Why All In One Marketplace
