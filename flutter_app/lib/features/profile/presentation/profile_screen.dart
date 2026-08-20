@@ -12,6 +12,8 @@ import 'security_screen.dart';
 import 'notification_settings_screen.dart';
 import 'verification_application_screen.dart';
 import '../../ai_assistant/presentation/ai_assistant_screen.dart';
+import '../../help/presentation/help_center_screen.dart';
+import '../../help/presentation/safety_tips_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -280,6 +282,28 @@ class ProfileScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const NotificationSettingsScreen()),
+              );
+            },
+          ),
+          _buildProfileOption(
+            icon: Icons.help_outline,
+            title: 'Help Center & Support',
+            subtitle: 'Search FAQs & contact support team',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HelpCenterScreen()),
+              );
+            },
+          ),
+          _buildProfileOption(
+            icon: Icons.shield_outlined,
+            title: 'Safety Tips',
+            subtitle: 'Guidelines for safe buying & selling',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SafetyTipsScreen()),
               );
             },
           ),

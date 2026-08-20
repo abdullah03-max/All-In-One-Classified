@@ -20,6 +20,8 @@ import ProfilePage from './pages/ProfilePage';
 import ChatPage from './pages/ChatPage';
 import NotFoundPage from './pages/NotFoundPage';
 import { PaymentResultPage } from './pages/PaymentResultPage';
+import HelpCenterPage from './pages/HelpCenterPage';
+import SafetyTipsPage from './pages/SafetyTipsPage';
 
 // Auth Pages
 import { LoginPage, RegisterPage, ForgotPasswordPage, AdminLoginPage, ModeratorLoginPage } from './pages/auth/AuthPages';
@@ -169,6 +171,10 @@ const App: React.FC = () => {
                 <Route path="/listings/:id" element={<ListingDetailPage />} />
                 <Route path="/category/:slug" element={<CategoryPage />} />
                 <Route path="/payment/status" element={<PaymentResultPage />} />
+                <Route path="/help" element={<HelpCenterPage />} />
+                <Route path="/help-center" element={<HelpCenterPage />} />
+                <Route path="/safety" element={<SafetyTipsPage />} />
+                <Route path="/safety-tips" element={<SafetyTipsPage />} />
 
                 {/* ============================================================
                     PROTECTED ROUTES
