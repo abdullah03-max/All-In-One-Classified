@@ -46,13 +46,17 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
           .order('created_at', ascending: false);
 
       final List<dynamic> data = response as List<dynamic>;
-      setState(() {
-        _listings = data.map((j) => ListingModel.fromJson(j)).toList();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _listings = data.map((j) => ListingModel.fromJson(j)).toList();
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       print('Error fetching seller listings: $e');
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -88,13 +92,13 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Listing'),
-        content: const Text('Are you sure you want to permanently delete this listing?'),
+        content: const Text('Are you sure you want to permanently delete this listing? This action cannot be undone.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text('Delete'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            child: const Text('Delete Permanently'),
           ),
         ],
       ),
@@ -106,13 +110,15 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
         _fetchMyListings();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Listing deleted successfully.')),
+            const SnackBar(content: Text('Listing deleted successfully.'), backgroundColor: Color(0xFF10B981)),
           );
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting listing: $e')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting listing: $e')),
+          );
+        }
       }
     }
   }
@@ -187,6 +193,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                             final listing = _filteredListings[index];
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                               child: Padding(
                                 padding: const EdgeInsets.all(12.0),
                                 child: Column(
@@ -199,7 +206,14 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                                             width: 80,
                                             height: 80,
                                             child: listing.images.isNotEmpty
-                                                ? CachedNetworkImage(imageUrl: listing.images.first, fit: BoxFit.cover)
+                                                ? CachedNetworkImage(
+                                                    imageUrl: listing.images.first,
+                                                    fit: BoxFit.cover,
+                                                    errorWidget: (_, __, ___) => Container(
+                                                      color: Colors.grey.shade200,
+                                                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                                                    ),
+                                                  )
                                                 : Container(color: Colors.grey.shade200, child: const Icon(Icons.image)),
                                           ),
                                         ),
@@ -232,61 +246,65 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                                         ),
                                       ],
                                     ),
-                                    const Divider(height: 20),
+                                    const Divider(height: 16),
 
-                                    // Action Buttons Bar
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                       children: [
-                                         TextButton.icon(
-                                           onPressed: () async {
-                                             final promoted = await Navigator.push<bool>(
-                                               context,
-                                               MaterialPageRoute(builder: (_) => PromoteListingScreen(listing: listing)),
-                                             );
-                                             if (promoted == true) _fetchMyListings();
-                                           },
-                                           icon: const Icon(Icons.rocket_launch, size: 16, color: Colors.amber),
-                                           label: const Text('Promote', style: TextStyle(color: Colors.amber)),
-                                         ),
-                                         TextButton.icon(
-                                           onPressed: () {
-                                             Navigator.push(
-                                               context,
-                                               MaterialPageRoute(builder: (_) => ListingDetailScreen(listing: listing)),
-                                             );
-                                           },
-                                           icon: const Icon(Icons.remove_red_eye, size: 16),
-                                           label: const Text('View'),
-                                         ),
-                                        TextButton.icon(
-                                          onPressed: () async {
-                                            final updated = await Navigator.push<bool>(
-                                              context,
-                                              MaterialPageRoute(builder: (_) => EditListingScreen(listing: listing)),
-                                            );
-                                            if (updated == true) _fetchMyListings();
-                                          },
-                                          icon: const Icon(Icons.edit, size: 16),
-                                          label: const Text('Edit'),
-                                        ),
-                                        if (listing.status == 'active')
+                                    // Action Buttons Bar with Horizontal Scroll to prevent ANY overflow
+                                    SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        children: [
                                           TextButton.icon(
-                                            onPressed: () => _markStatus(listing.id, 'sold'),
-                                            icon: const Icon(Icons.check_circle_outline, size: 16, color: Colors.blue),
-                                            label: const Text('Mark Sold', style: TextStyle(color: Colors.blue)),
-                                          )
-                                        else if (listing.status == 'sold')
-                                          TextButton.icon(
-                                            onPressed: () => _markStatus(listing.id, 'active'),
-                                            icon: const Icon(Icons.refresh, size: 16, color: Color(0xFF10B981)),
-                                            label: const Text('Re-activate', style: TextStyle(color: Color(0xFF10B981))),
+                                            onPressed: () async {
+                                              final promoted = await Navigator.push<bool>(
+                                                context,
+                                                MaterialPageRoute(builder: (_) => PromoteListingScreen(listing: listing)),
+                                              );
+                                              if (promoted == true) _fetchMyListings();
+                                            },
+                                            icon: const Icon(Icons.rocket_launch, size: 15, color: Colors.amber),
+                                            label: const Text('Promote', style: TextStyle(color: Colors.amber, fontSize: 12)),
                                           ),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                                          onPressed: () => _deleteListing(listing.id),
-                                        ),
-                                      ],
+                                          TextButton.icon(
+                                            onPressed: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(builder: (_) => ListingDetailScreen(listing: listing)),
+                                              );
+                                            },
+                                            icon: const Icon(Icons.remove_red_eye, size: 15),
+                                            label: const Text('View', style: TextStyle(fontSize: 12)),
+                                          ),
+                                          TextButton.icon(
+                                            onPressed: () async {
+                                              final updated = await Navigator.push<bool>(
+                                                context,
+                                                MaterialPageRoute(builder: (_) => EditListingScreen(listing: listing)),
+                                              );
+                                              if (updated == true) _fetchMyListings();
+                                            },
+                                            icon: const Icon(Icons.edit, size: 15),
+                                            label: const Text('Edit', style: TextStyle(fontSize: 12)),
+                                          ),
+                                          if (listing.status == 'active')
+                                            TextButton.icon(
+                                              onPressed: () => _markStatus(listing.id, 'sold'),
+                                              icon: const Icon(Icons.check_circle_outline, size: 15, color: Colors.blue),
+                                              label: const Text('Mark Sold', style: TextStyle(color: Colors.blue, fontSize: 12)),
+                                            )
+                                          else if (listing.status == 'sold')
+                                            TextButton.icon(
+                                              onPressed: () => _markStatus(listing.id, 'active'),
+                                              icon: const Icon(Icons.refresh, size: 15, color: Color(0xFF10B981)),
+                                              label: const Text('Re-activate', style: TextStyle(color: Color(0xFF10B981), fontSize: 12)),
+                                            ),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                            tooltip: 'Delete Listing',
+                                            onPressed: () => _deleteListing(listing.id),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
