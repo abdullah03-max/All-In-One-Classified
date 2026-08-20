@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../data/category_model.dart';
 import '../data/category_repository.dart';
-import '../../listings/presentation/listings_search_screen.dart';
+import 'category_listings_screen.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -25,13 +25,15 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   Future<void> _loadCategories() async {
     final cats = await _repository.getCategoriesHierarchy();
-    setState(() {
-      _categories = cats;
-      if (cats.isNotEmpty) {
-        _selectedCategory = cats.first;
-      }
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _categories = cats;
+        if (cats.isNotEmpty) {
+          _selectedCategory = cats.first;
+        }
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -47,7 +49,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                 // Left Column: Top-Level Parent Categories List
                 Container(
                   width: 120,
-                  color: Colors.grey.shade100,
+                  color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF0F172A) : Colors.grey.shade100,
                   child: ListView.builder(
                     itemCount: _categories.length,
                     itemBuilder: (context, index) {
@@ -59,7 +61,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
                           decoration: BoxDecoration(
-                            color: isSelected ? Colors.white : Colors.transparent,
+                            color: isSelected
+                                ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white)
+                                : Colors.transparent,
                             border: Border(
                               left: BorderSide(
                                 color: isSelected ? AppTheme.primaryColor : Colors.transparent,
@@ -88,7 +92,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                  color: isSelected ? AppTheme.primaryColor : Colors.black87,
+                                  color: isSelected ? AppTheme.primaryColor : null,
                                 ),
                               ),
                             ],
@@ -112,14 +116,19 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => ListingsSearchScreen(
-                                      initialCategoryId: _selectedCategory!.id,
-                                      initialCategoryName: _selectedCategory!.name,
+                                    builder: (_) => CategoryListingsScreen(
+                                      category: _selectedCategory!,
                                     ),
                                   ),
                                 );
                               },
-                              icon: const Icon(Icons.grid_view),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryColor,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              icon: const Icon(Icons.grid_view, size: 18),
                               label: Text('All in ${_selectedCategory!.name}'),
                             ),
                             const SizedBox(height: 16),
@@ -132,13 +141,14 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                 children: [
                                   ListTile(
                                     title: Text('All ${sub.name}', style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                                    trailing: const Icon(Icons.arrow_forward_ios, size: 12, color: AppTheme.primaryColor),
                                     onTap: () {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => ListingsSearchScreen(
-                                            initialCategoryId: sub.id,
-                                            initialCategoryName: sub.name,
+                                          builder: (_) => CategoryListingsScreen(
+                                            category: _selectedCategory!,
+                                            initialSubcategoryId: sub.id,
                                           ),
                                         ),
                                       );
@@ -155,9 +165,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                            builder: (_) => ListingsSearchScreen(
-                                              initialCategoryId: subsub.id,
-                                              initialCategoryName: subsub.name,
+                                            builder: (_) => CategoryListingsScreen(
+                                              category: _selectedCategory!,
+                                              initialSubcategoryId: sub.id,
+                                              initialSubSubcategoryId: subsub.id,
                                             ),
                                           ),
                                         );
@@ -179,9 +190,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     final n = name.toLowerCase();
     if (n.contains('vehicle') || n.contains('car') || n.contains('auto')) return Icons.directions_car;
     if (n.contains('mobile') || n.contains('phone')) return Icons.smartphone;
+    if (n.contains('bike') || n.contains('motorcycle')) return Icons.two_wheeler;
     if (n.contains('real estate') || n.contains('property') || n.contains('house')) return Icons.home;
     if (n.contains('electronic') || n.contains('appliance')) return Icons.tv;
     if (n.contains('fashion') || n.contains('cloth')) return Icons.checkroom;
+    if (n.contains('furniture')) return Icons.chair;
+    if (n.contains('animal') || n.contains('pet')) return Icons.pets;
     if (n.contains('job')) return Icons.work;
     if (n.contains('service')) return Icons.build;
     return Icons.category;

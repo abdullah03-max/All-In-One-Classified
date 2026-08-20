@@ -3,6 +3,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../categories/data/category_model.dart';
 import '../../categories/data/category_repository.dart';
 import '../../categories/presentation/categories_screen.dart';
+import '../../categories/presentation/category_listings_screen.dart';
 import '../../listings/data/listing_model.dart';
 import '../../listings/data/listing_repository.dart';
 import '../../listings/presentation/listings_search_screen.dart';
@@ -23,9 +24,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<CategoryModel> _categories = [];
   List<ListingModel> _featuredListings = [];
-  List<ListingModel> _recentListings = [];
   Map<String, List<ListingModel>> _categoryListings = {};
   bool _isLoading = true;
+  String _currentCity = 'Pakistan';
 
   @override
   void initState() {
@@ -39,7 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final catsFuture = _categoryRepository.getCategoriesHierarchy();
       final featuredFuture = _listingRepository.getFeaturedListings(limit: 10);
-      final recentFuture = _listingRepository.getRecentListings(limit: 30);
+      final recentFuture = _listingRepository.getRecentListings(limit: 50);
 
       final results = await Future.wait([catsFuture, featuredFuture, recentFuture]);
 
@@ -47,67 +48,112 @@ class _HomeScreenState extends State<HomeScreen> {
       final featured = results[1] as List<ListingModel>;
       final recent = results[2] as List<ListingModel>;
 
-      // Group recent listings by Category
       final Map<String, List<ListingModel>> catMap = {};
-      for (final listing in recent) {
-        final catId = listing.categoryId ?? listing.category?.id;
-        if (catId != null && catId.isNotEmpty) {
-          catMap.putIfAbsent(catId, () => []).add(listing);
-        }
-      }
 
-      // Also for main categories that have subcategories, group subcategory listings under parent
       for (final parent in cats) {
         final subIds = parent.subcategories.map((s) => s.id).toSet();
-        if (subIds.isNotEmpty) {
-          final matching = recent.where((l) {
-            final cId = l.categoryId ?? l.category?.id ?? '';
-            final subId = l.subcategoryId ?? '';
-            return cId == parent.id || subIds.contains(cId) || subIds.contains(subId);
-          }).toList();
-          if (matching.isNotEmpty) {
-            catMap[parent.id] = matching;
+        final subSubIds = <String>{};
+        for (final s in parent.subcategories) {
+          for (final ss in s.subcategories) {
+            subSubIds.add(ss.id);
           }
+        }
+
+        final matching = recent.where((l) {
+          final cId = l.categoryId ?? l.category?.id ?? '';
+          final subId = l.subcategoryId ?? '';
+          final subSubId = l.subSubcategoryId ?? '';
+          return cId == parent.id ||
+              subIds.contains(cId) ||
+              subIds.contains(subId) ||
+              subSubIds.contains(cId) ||
+              subSubIds.contains(subSubId);
+        }).toList();
+
+        if (matching.isNotEmpty) {
+          catMap[parent.id] = matching;
         }
       }
 
-      setState(() {
-        _categories = cats;
-        _featuredListings = featured;
-        _recentListings = recent;
-        _categoryListings = catMap;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _categories = cats;
+          _featuredListings = featured;
+          _categoryListings = catMap;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       print('Load home data error: $e');
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
+  }
+
+  void _navigateToCategory(CategoryModel cat) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CategoryListingsScreen(category: cat),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
+        elevation: 0,
+        backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor,
-                borderRadius: BorderRadius.circular(10),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF3B82F6).withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: const Icon(Icons.storefront, color: Colors.white, size: 20),
             ),
             const SizedBox(width: 10),
-            const Text(
-              'All In One',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'All In One',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.5),
+                ),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 11, color: Color(0xFF10B981)),
+                    const SizedBox(width: 2),
+                    Text(
+                      _currentCity,
+                      style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.auto_awesome, color: Color(0xFF818CF8)),
+            icon: const Icon(Icons.auto_awesome, color: Color(0xFF6366F1), size: 22),
             tooltip: 'AI Assistant',
             onPressed: () {
               Navigator.push(
@@ -117,16 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ListingsSearchScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none),
+            icon: const Icon(Icons.notifications_none, size: 22),
             onPressed: () {
               Navigator.push(
                 context,
@@ -134,6 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
           ),
+          const SizedBox(width: 4),
         ],
       ),
       // Floating AI button strictly on Home Screen
@@ -144,11 +182,12 @@ class _HomeScreenState extends State<HomeScreen> {
             MaterialPageRoute(builder: (_) => const AiAssistantScreen()),
           );
         },
+        elevation: 6,
         backgroundColor: const Color(0xFF4F46E5),
         icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
         label: const Text(
           'Ask AI',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 0.3),
         ),
       ),
       body: RefreshIndicator(
@@ -156,120 +195,252 @@ class _HomeScreenState extends State<HomeScreen> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 40),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Search Bar Trigger Input
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const ListingsSearchScreen()),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).cardColor,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.search, color: Colors.grey),
-                            SizedBox(width: 10),
-                            Text('Search cars, mobiles, property...', style: TextStyle(color: Colors.grey, fontSize: 14)),
-                          ],
+                    // ── 1. MODERN SEARCH HERO BAR ──
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ListingsSearchScreen()),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.search, color: Color(0xFF3B82F6), size: 22),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Find cars, mobiles, laptops, houses...',
+                                  style: TextStyle(
+                                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF3B82F6).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.tune, color: Color(0xFF3B82F6), size: 16),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
 
-                    // Categories Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Categories', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const CategoriesScreen()),
-                            );
-                          },
-                          child: const Text('See All'),
+                    // ── 2. PROMOTIONAL HERO BANNER ──
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF4338CA)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Categories Dynamic Grid
-                    if (_categories.isNotEmpty)
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 4,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                        ),
-                        itemCount: _categories.length > 8 ? 8 : _categories.length,
-                        itemBuilder: (context, index) {
-                          final cat = _categories[index];
-                          return InkWell(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ListingsSearchScreen(
-                                    initialCategoryId: cat.id,
-                                    initialCategoryName: cat.name,
-                                  ),
-                                ),
-                              );
-                            },
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF4338CA).withOpacity(0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
                             child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                CircleAvatar(
-                                  radius: 24,
-                                  backgroundColor: AppTheme.primaryLight,
-                                  child: Icon(
-                                    _getCategoryIcon(cat.name),
-                                    color: AppTheme.primaryColor,
-                                    size: 22,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    '100% FREE CLASSIFIEDS',
+                                    style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
                                   ),
                                 ),
                                 const SizedBox(height: 6),
+                                const Text(
+                                  'Buy & Sell Anything Fast',
+                                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 2),
                                 Text(
-                                  cat.name,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                                  'Join thousands of verified sellers across Pakistan',
+                                  style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11),
                                 ),
                               ],
                             ),
-                          );
-                        },
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.rocket_launch, color: Colors.amber, size: 28),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+
+                    // ── 3. CATEGORIES EXPLORER ──
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Explore Categories',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const CategoriesScreen()),
+                              );
+                            },
+                            child: const Text('See All →', style: TextStyle(fontWeight: FontWeight.w600)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Categories Grid (Modern Cards)
+                    if (_categories.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 4,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 0.82,
+                          ),
+                          itemCount: _categories.length > 8 ? 8 : _categories.length,
+                          itemBuilder: (context, index) {
+                            final cat = _categories[index];
+                            final color = _getCategoryColor(index);
+
+                            return InkWell(
+                              onTap: () => _navigateToCategory(cat),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 54,
+                                    height: 54,
+                                    decoration: BoxDecoration(
+                                      color: color.withOpacity(isDark ? 0.2 : 0.12),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: color.withOpacity(0.25), width: 1),
+                                    ),
+                                    child: Center(
+                                      child: Icon(
+                                        _getCategoryIcon(cat.name),
+                                        color: color,
+                                        size: 24,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    cat.name,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.1,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     const SizedBox(height: 24),
 
-                    // Featured Listings Section
+                    // ── 4. FEATURED & PROMOTED LISTINGS ──
                     if (_featuredListings.isNotEmpty) ...[
-                      const Row(
-                        children: [
-                          Icon(Icons.star, color: Colors.amber, size: 20),
-                          SizedBox(width: 6),
-                          Text('Featured Listings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        ],
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.star, color: Colors.amber, size: 18),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Featured Listings',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'SPONSORED',
+                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.amber),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 12),
                       SizedBox(
                         height: 250,
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           itemCount: _featuredListings.length,
                           itemBuilder: (context, index) {
                             return Container(
@@ -280,90 +451,91 @@ class _HomeScreenState extends State<HomeScreen> {
                           },
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 26),
                     ],
 
-                    // ── CATEGORY-WISE ROWS (ROW BY ROW LIKE WEBSITE) ──
+                    // ── 5. CATEGORY-WISE LISTINGS (ROW BY ROW) ──
                     ..._categories.map((cat) {
                       final catItems = _categoryListings[cat.id] ?? [];
                       if (catItems.isEmpty) return const SizedBox.shrink();
 
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Icon(_getCategoryIcon(cat.name), color: AppTheme.primaryColor, size: 20),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    cat.name,
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.primaryColor.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Icon(
+                                          _getCategoryIcon(cat.name),
+                                          color: AppTheme.primaryColor,
+                                          size: 18,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        cat.name,
+                                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                                      ),
+                                    ],
+                                  ),
+                                  TextButton(
+                                    onPressed: () => _navigateToCategory(cat),
+                                    child: const Text('View All →', style: TextStyle(fontWeight: FontWeight.bold)),
                                   ),
                                 ],
                               ),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => ListingsSearchScreen(
-                                        initialCategoryId: cat.id,
-                                        initialCategoryName: cat.name,
-                                      ),
-                                    ),
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              height: 250,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                itemCount: catItems.length,
+                                itemBuilder: (context, index) {
+                                  return Container(
+                                    width: 180,
+                                    margin: const EdgeInsets.only(right: 12),
+                                    child: ListingCard(listing: catItems[index]),
                                   );
                                 },
-                                child: const Text('View All'),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            height: 250,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: catItems.length,
-                              itemBuilder: (context, index) {
-                                return Container(
-                                  width: 180,
-                                  margin: const EdgeInsets.only(right: 12),
-                                  child: ListingCard(listing: catItems[index]),
-                                );
-                              },
                             ),
-                          ),
-                          const SizedBox(height: 24),
-                        ],
+                          ],
+                        ),
                       );
                     }),
-
-                    // Recent Listings Header
-                    const Text('Recent Listings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-
-                    // Recent Listings Grid
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.72,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                      ),
-                      itemCount: _recentListings.length,
-                      itemBuilder: (context, index) {
-                        return ListingCard(listing: _recentListings[index]);
-                      },
-                    ),
                   ],
                 ),
               ),
       ),
     );
+  }
+
+  Color _getCategoryColor(int index) {
+    final colors = [
+      const Color(0xFFEF4444),
+      const Color(0xFFF97316),
+      const Color(0xFF3B82F6),
+      const Color(0xFF10B981),
+      const Color(0xFF8B5CF6),
+      const Color(0xFFEC4899),
+      const Color(0xFF06B6D4),
+      const Color(0xFFEAB308),
+    ];
+    return colors[index % colors.length];
   }
 
   IconData _getCategoryIcon(String name) {

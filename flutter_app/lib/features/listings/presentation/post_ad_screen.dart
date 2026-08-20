@@ -7,6 +7,7 @@ import '../../auth/presentation/login_screen.dart';
 import '../../categories/data/category_model.dart';
 import '../../categories/data/category_repository.dart';
 import '../../location/services/location_service.dart';
+import '../data/listing_repository.dart';
 
 class PostAdScreen extends StatefulWidget {
   const PostAdScreen({super.key});
@@ -42,10 +43,12 @@ class _PostAdScreenState extends State<PostAdScreen> {
   bool _isSubmitting = false;
   bool _isLocating = false;
 
-  // Images
+  // Images & Video
   final ImagePicker _picker = ImagePicker();
   final List<XFile> _selectedImageFiles = [];
   final List<String> _uploadedImageUrls = [];
+  XFile? _selectedVideoFile;
+  String? _uploadedVideoUrl;
 
   final List<String> _cities = [
     'Lahore', 'Karachi', 'Islamabad', 'Rawalpindi', 'Faisalabad',
@@ -152,6 +155,27 @@ class _PostAdScreenState extends State<PostAdScreen> {
     }
   }
 
+  Future<void> _pickVideo() async {
+    try {
+      final XFile? pickedVideo = await _picker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(minutes: 3),
+      );
+      if (pickedVideo != null) {
+        setState(() {
+          _selectedVideoFile = pickedVideo;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('🎥 Video attached successfully!'), backgroundColor: Color(0xFF10B981)),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error picking video: $e')),
+      );
+    }
+  }
+
   Future<void> _uploadImagesToSupabase() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
@@ -179,6 +203,29 @@ class _PostAdScreenState extends State<PostAdScreen> {
     }
   }
 
+  Future<void> _uploadVideoToSupabase() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null || _selectedVideoFile == null) return;
+
+    try {
+      final file = File(_selectedVideoFile!.path);
+      final fileExt = _selectedVideoFile!.path.split('.').last;
+      final fileName = 'videos/${user.id}/${DateTime.now().millisecondsSinceEpoch}_video.$fileExt';
+
+      await Supabase.instance.client.storage
+          .from('listings')
+          .upload(fileName, file);
+
+      final publicUrl = Supabase.instance.client.storage
+          .from('listings')
+          .getPublicUrl(fileName);
+
+      _uploadedVideoUrl = publicUrl;
+    } catch (e) {
+      print('Video storage upload warning: $e');
+    }
+  }
+
   Future<void> _submitListing() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
@@ -198,8 +245,9 @@ class _PostAdScreenState extends State<PostAdScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      // 1. Upload Images to Supabase Storage
+      // 1. Upload Images & Video to Supabase Storage
       await _uploadImagesToSupabase();
+      await _uploadVideoToSupabase();
 
       // 2. Insert Listing Record into 'listings' table
       final assignedCategoryId = _selectedSubSubcategory?.id ?? _selectedSubcategory?.id ?? _selectedCategory!.id;
@@ -219,7 +267,7 @@ class _PostAdScreenState extends State<PostAdScreen> {
         'category_id': assignedCategoryId,
         'subcategory_id': _selectedSubcategory?.id,
         'sub_subcategory_id': _selectedSubSubcategory?.id,
-        'condition': _selectedCondition,
+        'condition': ListingRepository.mapConditionToDb(_selectedCondition),
         'city': _selectedCity,
         'location': _selectedCity,
         'country': 'Pakistan',
@@ -227,6 +275,7 @@ class _PostAdScreenState extends State<PostAdScreen> {
         'is_featured': false,
         'status': 'active',
         'images': _uploadedImageUrls,
+        'video_url': _uploadedVideoUrl,
         'attributes': combinedAttributes,
         'views_count': 0,
       };
@@ -261,6 +310,8 @@ class _PostAdScreenState extends State<PostAdScreen> {
       _priceController.clear();
       _selectedImageFiles.clear();
       _uploadedImageUrls.clear();
+      _selectedVideoFile = null;
+      _uploadedVideoUrl = null;
       _selectedCategory = null;
       _selectedSubcategory = null;
       _selectedSubSubcategory = null;
@@ -319,10 +370,17 @@ class _PostAdScreenState extends State<PostAdScreen> {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a category')));
             return;
           }
+          if (_currentStep == 1) {
+            if (!_formKey.currentState!.validate()) return;
+          }
+          if (_currentStep == 2 && _isPriceEnabled) {
+            if (_priceController.text.trim().isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid price')));
+              return;
+            }
+          }
           if (_currentStep < 3) {
             setState(() => _currentStep += 1);
-          } else {
-            _submitListing();
           }
         },
         onStepCancel: () {
@@ -331,19 +389,24 @@ class _PostAdScreenState extends State<PostAdScreen> {
           }
         },
         steps: [
-          // Step 1: 3-Level Category Hierarchy Selection
+          // Step 1: Category, Subcategory, Sub-Subcategory Selector
           Step(
             title: const Text('Category'),
             isActive: _currentStep >= 0,
             content: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Select Category Hierarchy', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 12),
+                // 1. Main Category
                 DropdownButtonFormField<CategoryModel>(
                   value: _selectedCategory,
                   decoration: const InputDecoration(labelText: 'Main Category *'),
-                  items: _categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat.name))).toList(),
+                  hint: const Text('Select Main Category'),
+                  items: _categories.map((c) {
+                    return DropdownMenuItem(
+                      value: c,
+                      child: Text(c.name),
+                    );
+                  }).toList(),
                   onChanged: (cat) {
                     setState(() {
                       _selectedCategory = cat;
@@ -353,12 +416,20 @@ class _PostAdScreenState extends State<PostAdScreen> {
                     });
                   },
                 ),
+
+                // 2. Subcategory (if available)
                 if (_selectedCategory != null && _selectedCategory!.subcategories.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   DropdownButtonFormField<CategoryModel>(
                     value: _selectedSubcategory,
-                    decoration: const InputDecoration(labelText: 'Subcategory (Optional)'),
-                    items: _selectedCategory!.subcategories.map((sub) => DropdownMenuItem(value: sub, child: Text(sub.name))).toList(),
+                    decoration: const InputDecoration(labelText: 'Subcategory *'),
+                    hint: const Text('Select Subcategory'),
+                    items: _selectedCategory!.subcategories.map((sub) {
+                      return DropdownMenuItem(
+                        value: sub,
+                        child: Text(sub.name),
+                      );
+                    }).toList(),
                     onChanged: (sub) {
                       setState(() {
                         _selectedSubcategory = sub;
@@ -368,12 +439,20 @@ class _PostAdScreenState extends State<PostAdScreen> {
                     },
                   ),
                 ],
+
+                // 3. Sub-Subcategory (if available)
                 if (_selectedSubcategory != null && _selectedSubcategory!.subcategories.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   DropdownButtonFormField<CategoryModel>(
                     value: _selectedSubSubcategory,
                     decoration: const InputDecoration(labelText: 'Sub-Subcategory (Optional)'),
-                    items: _selectedSubcategory!.subcategories.map((subsub) => DropdownMenuItem(value: subsub, child: Text(subsub.name))).toList(),
+                    hint: const Text('Select Sub-Subcategory'),
+                    items: _selectedSubcategory!.subcategories.map((subsub) {
+                      return DropdownMenuItem(
+                        value: subsub,
+                        child: Text(subsub.name),
+                      );
+                    }).toList(),
                     onChanged: (subsub) {
                       setState(() {
                         _selectedSubSubcategory = subsub;
@@ -521,55 +600,116 @@ class _PostAdScreenState extends State<PostAdScreen> {
                   ),
                   const SizedBox(height: 12),
                   SwitchListTile(
-                    title: const Text('Price Negotiable'),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Negotiable Price'),
+                    subtitle: const Text('Allow buyers to make offers'),
                     value: _isNegotiable,
                     onChanged: (v) => setState(() => _isNegotiable = v),
                   ),
                   const SizedBox(height: 16),
                 ],
 
-                // GPS Location Detection Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: OutlinedButton.icon(
-                    onPressed: _isLocating ? null : _detectCurrentLocation,
-                    icon: _isLocating
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.my_location, color: AppTheme.primaryColor),
-                    label: Text(_isLocating ? 'Detecting Location...' : 'Use Current GPS Location'),
-                    style: OutlinedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                // Location / City Selection
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _cities.contains(_selectedCity) ? _selectedCity : _cities.first,
+                        decoration: const InputDecoration(labelText: 'City / Location *', prefixIcon: Icon(Icons.location_on)),
+                        items: _cities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                        onChanged: (v) => setState(() => _selectedCity = v!),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                DropdownButtonFormField<String>(
-                  value: _selectedCity,
-                  decoration: const InputDecoration(labelText: 'City / Location *'),
-                  items: _cities.map((city) => DropdownMenuItem(value: city, child: Text(city))).toList(),
-                  onChanged: (city) => setState(() => _selectedCity = city!),
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      icon: _isLocating
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.my_location),
+                      tooltip: 'Auto-detect current city',
+                      onPressed: _isLocating ? null : _detectCurrentLocation,
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
 
-          // Step 4: Image Uploads
+          // Step 4: Photos & Product Video
           Step(
-            title: const Text('Photos & Submit'),
+            title: const Text('Photos & Video'),
             isActive: _currentStep >= 3,
             content: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Upload Item Photos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 8),
-                ElevatedButton.icon(
-                  onPressed: _pickImages,
-                  icon: const Icon(Icons.add_a_photo),
-                  label: const Text('Pick Photos from Gallery'),
+                const Text('Media Upload', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 4),
+                const Text('Add high quality photos & video to get 5x more buyers.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                const SizedBox(height: 16),
+
+                // Upload Buttons
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 10,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _pickImages,
+                      icon: const Icon(Icons.add_a_photo, size: 18),
+                      label: Text('Add Photos (${_selectedImageFiles.length})'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _pickVideo,
+                      icon: const Icon(Icons.video_library, size: 18),
+                      label: Text(_selectedVideoFile != null ? 'Video Selected' : 'Add Product Video'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF10B981),
+                        side: const BorderSide(color: Color(0xFF10B981)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
+
+                // Video Preview Card
+                if (_selectedVideoFile != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.movie_creation, color: Color(0xFF10B981), size: 28),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Product Video Attached', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              Text(_selectedVideoFile!.name, style: const TextStyle(fontSize: 11, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                          onPressed: () => setState(() => _selectedVideoFile = null),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Selected Images Grid
                 if (_selectedImageFiles.isNotEmpty)
                   GridView.builder(
                     shrinkWrap: true,
