@@ -12,6 +12,15 @@ export interface StandardAttributeDef {
   badge: string;
 }
 
+export interface CustomAttributeDef {
+  name: string;
+  label: string;
+  type: 'select' | 'text' | 'number' | 'checkbox' | 'radio';
+  required: boolean;
+  options?: string[];
+  isStandard?: boolean;
+}
+
 export const STANDARD_ATTRIBUTES: Record<string, StandardAttributeDef> = {
   condition_full: {
     id: 'condition_full',
@@ -64,6 +73,31 @@ export const STANDARD_ATTRIBUTES: Record<string, StandardAttributeDef> = {
 };
 
 /**
+ * Checks if Price is enabled for this category schema.
+ * Defaults to true unless explicitly disabled (e.g. for Jobs or Services).
+ */
+export const getPriceEnabled = (attributesSchema: any = []): boolean => {
+  if (!attributesSchema) return true;
+  if (Array.isArray(attributesSchema)) {
+    // Check if there is a meta field
+    const meta = attributesSchema.find(f => f && (f._type === '__category_config__' || f.name === '__price_config__'));
+    if (meta && typeof meta.price_enabled === 'boolean') {
+      return meta.price_enabled;
+    }
+    // Also check if any field has price_enabled: false
+    const disabledField = attributesSchema.find(f => f && f.price_enabled === false);
+    if (disabledField) return false;
+    return true;
+  }
+  if (typeof attributesSchema === 'object' && attributesSchema !== null) {
+    if (typeof attributesSchema.price_enabled === 'boolean') {
+      return attributesSchema.price_enabled;
+    }
+  }
+  return true;
+};
+
+/**
  * Extracts enabled standard attribute IDs from a category's attributes_schema array.
  */
 export const getEnabledStandardAttrIds = (attributesSchema: any[] = []): string[] => {
@@ -71,7 +105,8 @@ export const getEnabledStandardAttrIds = (attributesSchema: any[] = []): string[
   
   const enabledIds: string[] = [];
   attributesSchema.forEach(field => {
-    if (field && (field.isStandard || field.is_standard)) {
+    if (!field || field._type === '__category_config__') return;
+    if (field.isStandard || field.is_standard) {
       const stdId = field.standardId || field.standard_id || field.name;
       if (stdId && STANDARD_ATTRIBUTES[stdId]) {
         enabledIds.push(stdId);
@@ -83,20 +118,37 @@ export const getEnabledStandardAttrIds = (attributesSchema: any[] = []): string[
 };
 
 /**
- * Filter out standard attributes to keep custom attributes separate.
+ * Filter out standard attributes and config objects to keep custom attributes separate.
  */
-export const getCustomAttributesSchema = (attributesSchema: any[] = []): any[] => {
+export const getCustomAttributesSchema = (attributesSchema: any[] = []): CustomAttributeDef[] => {
   if (!Array.isArray(attributesSchema)) return [];
-  return attributesSchema.filter(field => field && !field.isStandard && !field.is_standard);
+  return attributesSchema.filter(field => 
+    field && 
+    field._type !== '__category_config__' && 
+    field.name !== '__price_config__' &&
+    !field.isStandard && 
+    !field.is_standard
+  );
 };
 
 /**
- * Combines selected standard attribute IDs and custom attribute fields into a unified attributes_schema array.
+ * Combines priceEnabled setting, selected standard attribute IDs, and custom attribute fields
+ * into a unified attributes_schema array.
  */
-export const combineAttributesSchema = (enabledStandardIds: string[] = [], customFields: any[] = []): any[] => {
+export const combineAttributesSchema = (
+  enabledStandardIds: string[] = [], 
+  customFields: CustomAttributeDef[] = [],
+  priceEnabled: boolean = true
+): any[] => {
   const combined: any[] = [];
 
-  // Add standard attributes first
+  // Add Category Config header object (stores price_enabled and metadata)
+  combined.push({
+    _type: '__category_config__',
+    price_enabled: priceEnabled,
+  });
+
+  // Add standard attributes
   enabledStandardIds.forEach(stdId => {
     const def = STANDARD_ATTRIBUTES[stdId];
     if (def) {

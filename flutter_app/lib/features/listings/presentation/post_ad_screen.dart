@@ -35,6 +35,8 @@ class _PostAdScreenState extends State<PostAdScreen> {
   final _priceController = TextEditingController();
 
   String _selectedCondition = 'used';
+  String? _selectedAnimalSex;
+  String? _selectedHumanGender;
   String _selectedCity = 'Lahore';
   bool _isNegotiable = true;
   bool _isSubmitting = false;
@@ -51,8 +53,6 @@ class _PostAdScreenState extends State<PostAdScreen> {
     'Abbottabad', 'Bahawalpur', 'Sargodha', 'Sukkur', 'Larkana', 'Sheikhupura',
     'Jhang', 'Rahim Yar Khan', 'Gujrat'
   ];
-
-  final List<String> _conditions = ['new', 'used', 'refurbished', 'open_box'];
 
   @override
   void initState() {
@@ -75,12 +75,24 @@ class _PostAdScreenState extends State<PostAdScreen> {
     }
   }
 
-  List<dynamic> get _activeAttributesSchema {
-    final active = _selectedSubSubcategory ?? _selectedSubcategory ?? _selectedCategory;
-    if (active != null && active.attributesSchema.isNotEmpty) {
-      return active.attributesSchema;
+  CategoryModel? get _activeCategory {
+    return _selectedSubSubcategory ?? _selectedSubcategory ?? _selectedCategory;
+  }
+
+  bool get _isPriceEnabled {
+    final active = _activeCategory;
+    if (active == null) return true;
+    return active.isPriceEnabled;
+  }
+
+  List<String> get _conditionOptions {
+    final active = _activeCategory;
+    if (active == null) return ['new', 'used', 'refurbished', 'open_box'];
+    final type = active.conditionType;
+    if (type == 'simple') {
+      return ['new', 'used'];
     }
-    return [];
+    return ['new', 'used', 'refurbished', 'open_box'];
   }
 
   Future<void> _detectCurrentLocation() async {
@@ -192,11 +204,17 @@ class _PostAdScreenState extends State<PostAdScreen> {
       // 2. Insert Listing Record into 'listings' table
       final assignedCategoryId = _selectedSubSubcategory?.id ?? _selectedSubcategory?.id ?? _selectedCategory!.id;
 
+      final combinedAttributes = Map<String, dynamic>.from(_dynamicAttributes);
+      if (_selectedAnimalSex != null) combinedAttributes['sex'] = _selectedAnimalSex;
+      if (_selectedHumanGender != null) combinedAttributes['gender'] = _selectedHumanGender;
+
+      final priceValue = _isPriceEnabled ? (double.tryParse(_priceController.text.trim()) ?? 0.0) : 0.0;
+
       final payload = {
         'seller_id': user.id,
         'title': _titleController.text.trim(),
         'description': _descController.text.trim(),
-        'price': double.tryParse(_priceController.text.trim()) ?? 0,
+        'price': priceValue,
         'currency': 'PKR',
         'category_id': assignedCategoryId,
         'subcategory_id': _selectedSubcategory?.id,
@@ -205,11 +223,11 @@ class _PostAdScreenState extends State<PostAdScreen> {
         'city': _selectedCity,
         'location': _selectedCity,
         'country': 'Pakistan',
-        'is_negotiable': _isNegotiable,
+        'is_negotiable': _isPriceEnabled ? _isNegotiable : false,
         'is_featured': false,
         'status': 'active',
         'images': _uploadedImageUrls,
-        'attributes': _dynamicAttributes,
+        'attributes': combinedAttributes,
         'views_count': 0,
       };
 
@@ -247,6 +265,8 @@ class _PostAdScreenState extends State<PostAdScreen> {
       _selectedSubcategory = null;
       _selectedSubSubcategory = null;
       _dynamicAttributes.clear();
+      _selectedAnimalSex = null;
+      _selectedHumanGender = null;
     });
   }
 
@@ -299,7 +319,7 @@ class _PostAdScreenState extends State<PostAdScreen> {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a category')));
             return;
           }
-          if (_currentStep < 4) {
+          if (_currentStep < 3) {
             setState(() => _currentStep += 1);
           } else {
             _submitListing();
@@ -311,7 +331,7 @@ class _PostAdScreenState extends State<PostAdScreen> {
           }
         },
         steps: [
-          // Step 1: Category Hierarchy Selection
+          // Step 1: 3-Level Category Hierarchy Selection
           Step(
             title: const Text('Category'),
             isActive: _currentStep >= 0,
@@ -388,26 +408,57 @@ class _PostAdScreenState extends State<PostAdScreen> {
                     validator: (v) => v == null || v.trim().isEmpty ? 'Description is required' : null,
                   ),
                   const SizedBox(height: 16),
+
+                  // Condition Dropdown
                   DropdownButtonFormField<String>(
-                    value: _selectedCondition,
+                    value: _conditionOptions.contains(_selectedCondition) ? _selectedCondition : _conditionOptions.first,
                     decoration: const InputDecoration(labelText: 'Condition'),
-                    items: _conditions.map((c) => DropdownMenuItem(value: c, child: Text(c.replaceAll('_', ' ').toUpperCase()))).toList(),
+                    items: _conditionOptions.map((c) => DropdownMenuItem(value: c, child: Text(c.replaceAll('_', ' ').toUpperCase()))).toList(),
                     onChanged: (v) => setState(() => _selectedCondition = v!),
                   ),
 
-                  // ── DYNAMIC CATEGORY ATTRIBUTES (From Admin attributes_schema) ──
-                  if (_activeAttributesSchema.isNotEmpty) ...[
+                  // Animal Sex (if enabled for category)
+                  if (_activeCategory?.hasAnimalSex == true) ...[
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _selectedAnimalSex,
+                      decoration: const InputDecoration(labelText: 'Sex (Animal)'),
+                      items: const [
+                        DropdownMenuItem(value: 'male', child: Text('Male')),
+                        DropdownMenuItem(value: 'female', child: Text('Female')),
+                        DropdownMenuItem(value: 'pair', child: Text('Pair')),
+                      ],
+                      onChanged: (v) => setState(() => _selectedAnimalSex = v),
+                    ),
+                  ],
+
+                  // Human Gender (if enabled for category)
+                  if (_activeCategory?.hasHumanGender == true) ...[
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _selectedHumanGender,
+                      decoration: const InputDecoration(labelText: 'Gender'),
+                      items: const [
+                        DropdownMenuItem(value: 'male', child: Text('Male')),
+                        DropdownMenuItem(value: 'female', child: Text('Female')),
+                        DropdownMenuItem(value: 'other', child: Text('Other')),
+                      ],
+                      onChanged: (v) => setState(() => _selectedHumanGender = v),
+                    ),
+                  ],
+
+                  // ── DYNAMIC CUSTOM ATTRIBUTES BUILDER FIELDS ──
+                  if (_activeCategory != null && _activeCategory!.customFields.isNotEmpty) ...[
                     const SizedBox(height: 24),
                     const Text('Category Specifications', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 12),
-                    ..._activeAttributesSchema.map((field) {
-                      if (field is! Map) return const SizedBox.shrink();
-                      final fieldName = field['name']?.toString() ?? '';
-                      final fieldLabel = field['label']?.toString() ?? fieldName;
-                      final fieldType = field['type']?.toString() ?? 'text';
-                      final options = field['options'] is List ? (field['options'] as List).map((o) => o.toString()).toList() : <String>[];
+                    ..._activeCategory!.customFields.map((field) {
+                      final fieldName = field.name;
+                      final fieldLabel = field.label + (field.required ? ' *' : '');
+                      final fieldType = field.type;
+                      final options = field.options;
 
-                      if (options.isNotEmpty || fieldType == 'select') {
+                      if (options.isNotEmpty || fieldType == 'select' || fieldType == 'radio') {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 14.0),
                           child: DropdownButtonFormField<String>(
@@ -423,7 +474,7 @@ class _PostAdScreenState extends State<PostAdScreen> {
                         );
                       }
 
-                      if (fieldType == 'boolean') {
+                      if (fieldType == 'checkbox' || fieldType == 'boolean') {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8.0),
                           child: SwitchListTile(
@@ -451,20 +502,31 @@ class _PostAdScreenState extends State<PostAdScreen> {
             ),
           ),
 
-          // Step 3: Price & Location (with GPS Location Button)
+          // Step 3: Price & Location (Price is conditionally rendered based on isPriceEnabled)
           Step(
-            title: const Text('Pricing & Location'),
+            title: Text(_isPriceEnabled ? 'Pricing & Location' : 'Location'),
             isActive: _currentStep >= 2,
             content: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextFormField(
-                  controller: _priceController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Price (PKR) *', prefixText: 'PKR '),
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Price is required' : null,
-                ),
-                const SizedBox(height: 16),
+                if (_isPriceEnabled) ...[
+                  TextFormField(
+                    controller: _priceController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Price (PKR) *', prefixText: 'PKR '),
+                    validator: (v) {
+                      if (!_isPriceEnabled) return null;
+                      return v == null || v.trim().isEmpty ? 'Price is required' : null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    title: const Text('Price Negotiable'),
+                    value: _isNegotiable,
+                    onChanged: (v) => setState(() => _isNegotiable = v),
+                  ),
+                  const SizedBox(height: 16),
+                ],
 
                 // GPS Location Detection Button
                 SizedBox(
@@ -489,19 +551,13 @@ class _PostAdScreenState extends State<PostAdScreen> {
                   items: _cities.map((city) => DropdownMenuItem(value: city, child: Text(city))).toList(),
                   onChanged: (city) => setState(() => _selectedCity = city!),
                 ),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  title: const Text('Price Negotiable'),
-                  value: _isNegotiable,
-                  onChanged: (v) => setState(() => _isNegotiable = v),
-                ),
               ],
             ),
           ),
 
           // Step 4: Image Uploads
           Step(
-            title: const Text('Photos'),
+            title: const Text('Photos & Submit'),
             isActive: _currentStep >= 3,
             content: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -527,24 +583,31 @@ class _PostAdScreenState extends State<PostAdScreen> {
                     itemBuilder: (context, index) {
                       return Stack(
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              File(_selectedImageFiles[index].path),
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              height: double.infinity,
+                          Positioned.fill(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(
+                                File(_selectedImageFiles[index].path),
+                                fit: BoxFit.cover,
+                              ),
                             ),
                           ),
                           Positioned(
                             top: 4,
                             right: 4,
                             child: GestureDetector(
-                              onTap: () => setState(() => _selectedImageFiles.removeAt(index)),
-                              child: const CircleAvatar(
-                                radius: 12,
-                                backgroundColor: Colors.red,
-                                child: Icon(Icons.close, size: 14, color: Colors.white),
+                              onTap: () {
+                                setState(() {
+                                  _selectedImageFiles.removeAt(index);
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: const BoxDecoration(
+                                  color: Colors.black54,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.close, size: 16, color: Colors.white),
                               ),
                             ),
                           ),
@@ -552,35 +615,21 @@ class _PostAdScreenState extends State<PostAdScreen> {
                       );
                     },
                   ),
-              ],
-            ),
-          ),
-
-          // Step 5: Preview & Final Submit
-          Step(
-            title: const Text('Preview & Publish'),
-            isActive: _currentStep >= 4,
-            content: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Review Ad Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                const SizedBox(height: 12),
-                ListTile(
-                  title: Text(_titleController.text.isEmpty ? 'Untitled Ad' : _titleController.text, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('${_selectedCategory?.name ?? ''} • ${_selectedCity}'),
-                  trailing: Text('PKR ${_priceController.text}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryColor, fontSize: 16)),
-                ),
-                const Divider(),
-                Text(_descController.text, style: const TextStyle(height: 1.4)),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 if (_isSubmitting)
-                  const Center(
-                    child: Column(
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 8),
-                        Text('Uploading photos & publishing ad...'),
-                      ],
+                  const Center(child: CircularProgressIndicator())
+                else
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: _submitListing,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Post Ad Now', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
               ],

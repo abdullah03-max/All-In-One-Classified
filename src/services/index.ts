@@ -161,29 +161,15 @@ export const categoriesService = {
         .select('*')
         .order('sort_order', { ascending: true });
 
-      const allVirtualFlat = flattenVirtualCategories(CATEGORIES);
-
-      if (error || !dbCats || dbCats.length === 0) {
-        return allVirtualFlat;
+      if (error) {
+        console.error('getCategories database error:', error);
+        return [];
       }
 
-      // Merge DB records with virtual flat categories (DB records take precedence)
-      const mergedMap = new Map<string, Category>();
-
-      // 1. Put all DB records first
-      dbCats.forEach(c => mergedMap.set(c.id, c as unknown as Category));
-
-      // 2. Add missing virtual categories
-      allVirtualFlat.forEach(vc => {
-        if (!mergedMap.has(vc.id)) {
-          mergedMap.set(vc.id, vc);
-        }
-      });
-
-      return Array.from(mergedMap.values()).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      return (dbCats || []) as unknown as Category[];
     } catch (err) {
-      console.error('getCategories error, using fallback static categories:', err);
-      return flattenVirtualCategories(CATEGORIES);
+      console.error('getCategories error:', err);
+      return [];
     }
   },
 };

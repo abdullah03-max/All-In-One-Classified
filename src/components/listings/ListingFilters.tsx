@@ -6,6 +6,7 @@ import { Button, Input, Select } from '../ui';
 import { CONDITIONS, CITIES } from '../../utils/constants';
 import { cn } from '../../utils/helpers';
 import { categoriesService } from '../../services';
+import { getPriceEnabled } from '../../utils/standardAttributes';
 
 interface ListingFiltersProps {
   filters: SearchFilters;
@@ -64,24 +65,32 @@ const ListingFilters: React.FC<ListingFiltersProps> = ({ filters, onChange, onRe
   const FilterContent = () => (
     <div className="space-y-0">
       {/* Price Range */}
-      <Section title="Price Range">
-        <div className="flex gap-2">
-          <Input
-            type="number"
-            placeholder="Min"
-            value={filters.min_price ?? ''}
-            onChange={e => handleChange('min_price', e.target.value ? Number(e.target.value) : undefined)}
-            className="text-sm"
-          />
-          <Input
-            type="number"
-            placeholder="Max"
-            value={filters.max_price ?? ''}
-            onChange={e => handleChange('max_price', e.target.value ? Number(e.target.value) : undefined)}
-            className="text-sm"
-          />
-        </div>
-      </Section>
+      {(() => {
+        const activeCat = allCategories.find(c => c.id === filters.category_id);
+        const isPriceOn = activeCat ? getPriceEnabled((activeCat as any).attributes_schema) : true;
+        if (!isPriceOn) return null;
+
+        return (
+          <Section title="Price Range">
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                placeholder="Min"
+                value={filters.min_price ?? ''}
+                onChange={e => handleChange('min_price', e.target.value ? Number(e.target.value) : undefined)}
+                className="text-sm"
+              />
+              <Input
+                type="number"
+                placeholder="Max"
+                value={filters.max_price ?? ''}
+                onChange={e => handleChange('max_price', e.target.value ? Number(e.target.value) : undefined)}
+                className="text-sm"
+              />
+            </div>
+          </Section>
+        );
+      })()}
 
       {/* Condition */}
       {(() => {
