@@ -1,3 +1,5 @@
+import 'category_constants.dart';
+
 class CategoryCustomField {
   final String name;
   final String label;
@@ -56,8 +58,12 @@ class CategoryModel {
 
   factory CategoryModel.fromJson(Map<String, dynamic> json, {List<CategoryModel> subcats = const []}) {
     List<dynamic> schema = [];
-    if (json['attributes_schema'] is List) {
+    if (json['attributes_schema'] is List && (json['attributes_schema'] as List).isNotEmpty) {
       schema = json['attributes_schema'] as List<dynamic>;
+    } else {
+      final name = json['name']?.toString() ?? '';
+      final slug = json['slug']?.toString() ?? '';
+      schema = CategoryConstants.getSchemaForCategory(name, slug);
     }
 
     return CategoryModel(
@@ -127,6 +133,18 @@ class CategoryModel {
   /// Extracts clean custom attributes list (excluding standard & config headers)
   List<CategoryCustomField> get customFields {
     final List<CategoryCustomField> list = [];
+    final standardKeys = {
+      'condition',
+      'condition_full',
+      'condition_simple',
+      'animal_sex',
+      'sex',
+      'human_gender',
+      'gender',
+      '__category_config__',
+      '__price_config__'
+    };
+
     for (final field in attributesSchema) {
       if (field is Map) {
         if (field['_type'] == '__category_config__' || field['name'] == '__price_config__') {
@@ -135,8 +153,8 @@ class CategoryModel {
         if (field['isStandard'] == true || field['is_standard'] == true) {
           continue;
         }
-        final stdId = field['standardId'] ?? field['name'];
-        if (stdId == 'condition_full' || stdId == 'condition_simple' || stdId == 'animal_sex' || stdId == 'human_gender') {
+        final name = (field['name'] ?? field['standardId'] ?? '').toString();
+        if (standardKeys.contains(name)) {
           continue;
         }
 

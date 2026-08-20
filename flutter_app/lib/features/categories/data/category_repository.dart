@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'category_model.dart';
+import 'category_constants.dart';
 
 class CategoryRepository {
   final SupabaseClient _client = Supabase.instance.client;
@@ -20,11 +21,23 @@ class CategoryRepository {
 
       // Build 3-level tree (Category -> Subcategory -> Sub-subcategory)
       return mainCats.map((parent) {
+        final parentSchema = parent.attributesSchema.isNotEmpty
+            ? parent.attributesSchema
+            : CategoryConstants.getSchemaForCategory(parent.name, parent.slug);
+
         final subcats = allCategories.where((c) => c.parentId == parent.id).map((sub) {
+          final subSchema = sub.attributesSchema.isNotEmpty
+              ? sub.attributesSchema
+              : (CategoryConstants.getSchemaForCategory(sub.name, sub.slug).isNotEmpty
+                  ? CategoryConstants.getSchemaForCategory(sub.name, sub.slug)
+                  : parentSchema);
+
           final subsubcats = allCategories.where((c) => c.parentId == sub.id).map((ss) {
             final ssSchema = ss.attributesSchema.isNotEmpty
                 ? ss.attributesSchema
-                : (sub.attributesSchema.isNotEmpty ? sub.attributesSchema : parent.attributesSchema);
+                : (CategoryConstants.getSchemaForCategory(ss.name, ss.slug).isNotEmpty
+                    ? CategoryConstants.getSchemaForCategory(ss.name, ss.slug)
+                    : subSchema);
 
             return CategoryModel(
               id: ss.id,
@@ -39,8 +52,6 @@ class CategoryRepository {
               subcategories: const [],
             );
           }).toList();
-
-          final subSchema = sub.attributesSchema.isNotEmpty ? sub.attributesSchema : parent.attributesSchema;
 
           return CategoryModel(
             id: sub.id,
@@ -65,7 +76,7 @@ class CategoryRepository {
           description: parent.description,
           color: parent.color,
           sortOrder: parent.sortOrder,
-          attributesSchema: parent.attributesSchema,
+          attributesSchema: parentSchema,
           subcategories: subcats,
         );
       }).toList();

@@ -49,11 +49,35 @@ class ListingRepository {
     }
   }
 
+  /// Fetches listings by category ID (or subcategory) for category rows on Home
+  Future<List<ListingModel>> getListingsByCategory(String categoryId, {int limit = 10}) async {
+    try {
+      final response = await _client
+          .from('listings')
+          .select('''
+            *,
+            category:categories!listings_category_id_fkey(id, name, slug, icon, color),
+            seller:users!listings_seller_id_fkey(id, full_name, avatar_url, is_verified, phone, city)
+          ''')
+          .eq('status', 'active')
+          .or('category_id.eq.$categoryId,subcategory_id.eq.$categoryId')
+          .order('created_at', ascending: false)
+          .limit(limit);
+
+      final List<dynamic> data = response as List<dynamic>;
+      return data.map((json) => ListingModel.fromJson(json)).toList();
+    } catch (e) {
+      print('Fetch category listings error: $e');
+      return [];
+    }
+  }
+
   /// Advanced Search, Filter & Paginated Query
   Future<List<ListingModel>> searchListings({
     String? queryText,
     String? categoryId,
     String? subcategoryId,
+    String? subSubcategoryId,
     double? minPrice,
     double? maxPrice,
     String? condition,
@@ -70,13 +94,16 @@ class ListingRepository {
       ''').eq('status', 'active');
 
       if (queryText != null && queryText.trim().isNotEmpty) {
-        query = query.or('title.ilike.%$queryText%,description.ilike.%$queryText%');
+        final q = queryText.trim();
+        query = query.or('title.ilike.%$q%,description.ilike.%$q%,city.ilike.%$q%');
       }
 
-      if (subcategoryId != null && subcategoryId.isNotEmpty) {
+      if (subSubcategoryId != null && subSubcategoryId.isNotEmpty) {
+        query = query.eq('sub_subcategory_id', subSubcategoryId);
+      } else if (subcategoryId != null && subcategoryId.isNotEmpty) {
         query = query.eq('subcategory_id', subcategoryId);
       } else if (categoryId != null && categoryId.isNotEmpty) {
-        query = query.eq('category_id', categoryId);
+        query = query.or('category_id.eq.$categoryId,subcategory_id.eq.$categoryId');
       }
 
       if (minPrice != null) {

@@ -31,7 +31,22 @@ class _ListingsSearchScreenState extends State<ListingsSearchScreen> {
   int _page = 1;
 
   String? _selectedCondition;
+  String? _selectedCity;
   String _selectedSort = 'created_at_desc';
+
+  final List<String> _cities = [
+    'All Cities',
+    'Lahore',
+    'Karachi',
+    'Islamabad',
+    'Rawalpindi',
+    'Faisalabad',
+    'Multan',
+    'Peshawar',
+    'Gujranwala',
+    'Sialkot',
+    'Quetta'
+  ];
 
   @override
   void initState() {
@@ -64,10 +79,13 @@ class _ListingsSearchScreenState extends State<ListingsSearchScreen> {
       _listings = [];
     });
 
+    final cityFilter = (_selectedCity == null || _selectedCity == 'All Cities') ? null : _selectedCity;
+
     final results = await _repository.searchListings(
       queryText: _searchController.text,
       categoryId: widget.initialCategoryId,
       condition: _selectedCondition,
+      city: cityFilter,
       sortBy: _selectedSort,
       page: 1,
     );
@@ -84,10 +102,13 @@ class _ListingsSearchScreenState extends State<ListingsSearchScreen> {
     setState(() => _isLoading = true);
 
     final nextPage = _page + 1;
+    final cityFilter = (_selectedCity == null || _selectedCity == 'All Cities') ? null : _selectedCity;
+
     final results = await _repository.searchListings(
       queryText: _searchController.text,
       categoryId: widget.initialCategoryId,
       condition: _selectedCondition,
+      city: cityFilter,
       sortBy: _selectedSort,
       page: nextPage,
     );
@@ -118,7 +139,7 @@ class _ListingsSearchScreenState extends State<ListingsSearchScreen> {
                     controller: _searchController,
                     onSubmitted: (_) => _loadListings(),
                     decoration: InputDecoration(
-                      hintText: 'Search cars, mobiles, property...',
+                      hintText: 'Search title, brand, model, city...',
                       prefixIcon: const Icon(Icons.search),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
@@ -148,6 +169,17 @@ class _ListingsSearchScreenState extends State<ListingsSearchScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [
+                if (_selectedCity != null && _selectedCity != 'All Cities') ...[
+                  Chip(
+                    avatar: const Icon(Icons.location_on, size: 16),
+                    label: Text(_selectedCity!),
+                    onDeleted: () {
+                      setState(() => _selectedCity = null);
+                      _loadListings();
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 FilterChip(
                   label: const Text('New'),
                   selected: _selectedCondition == 'new',
@@ -190,7 +222,7 @@ class _ListingsSearchScreenState extends State<ListingsSearchScreen> {
                           Icon(Icons.search_off, size: 60, color: Colors.grey),
                           SizedBox(height: 12),
                           Text('No listings found', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                          Text('Try adjusting your search query or filters', style: TextStyle(color: Colors.grey)),
+                          Text('Try adjusting your search query or city filters', style: TextStyle(color: Colors.grey)),
                         ],
                       ),
                     )
@@ -228,45 +260,76 @@ class _ListingsSearchScreenState extends State<ListingsSearchScreen> {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Sort Listings By', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            RadioListTile<String>(
-              title: const Text('Latest (Newest First)'),
-              value: 'created_at_desc',
-              groupValue: _selectedSort,
-              onChanged: (v) {
-                setState(() => _selectedSort = v!);
-                Navigator.pop(ctx);
-                _loadListings();
-              },
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Location / City', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: _selectedCity ?? 'All Cities',
+                  decoration: const InputDecoration(prefixIcon: Icon(Icons.location_city)),
+                  items: _cities.map((city) => DropdownMenuItem(value: city, child: Text(city))).toList(),
+                  onChanged: (val) {
+                    setState(() => _selectedCity = val);
+                    setModalState(() {});
+                  },
+                ),
+                const SizedBox(height: 18),
+                const Text('Sort Listings By', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                RadioListTile<String>(
+                  title: const Text('Latest (Newest First)'),
+                  value: 'created_at_desc',
+                  groupValue: _selectedSort,
+                  onChanged: (v) {
+                    setState(() => _selectedSort = v!);
+                    Navigator.pop(ctx);
+                    _loadListings();
+                  },
+                ),
+                RadioListTile<String>(
+                  title: const Text('Price: Low to High'),
+                  value: 'price_asc',
+                  groupValue: _selectedSort,
+                  onChanged: (v) {
+                    setState(() => _selectedSort = v!);
+                    Navigator.pop(ctx);
+                    _loadListings();
+                  },
+                ),
+                RadioListTile<String>(
+                  title: const Text('Price: High to Low'),
+                  value: 'price_desc',
+                  groupValue: _selectedSort,
+                  onChanged: (v) {
+                    setState(() => _selectedSort = v!);
+                    Navigator.pop(ctx);
+                    _loadListings();
+                  },
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _loadListings();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('Apply Filters', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
             ),
-            RadioListTile<String>(
-              title: const Text('Price: Low to High'),
-              value: 'price_asc',
-              groupValue: _selectedSort,
-              onChanged: (v) {
-                setState(() => _selectedSort = v!);
-                Navigator.pop(ctx);
-                _loadListings();
-              },
-            ),
-            RadioListTile<String>(
-              title: const Text('Price: High to Low'),
-              value: 'price_desc',
-              groupValue: _selectedSort,
-              onChanged: (v) {
-                setState(() => _selectedSort = v!);
-                Navigator.pop(ctx);
-                _loadListings();
-              },
-            ),
-          ],
+          ),
         ),
       ),
     );

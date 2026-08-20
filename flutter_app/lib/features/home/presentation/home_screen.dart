@@ -24,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<CategoryModel> _categories = [];
   List<ListingModel> _featuredListings = [];
   List<ListingModel> _recentListings = [];
+  Map<String, List<ListingModel>> _categoryListings = {};
   bool _isLoading = true;
 
   @override
@@ -35,18 +36,52 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadHomeData() async {
     setState(() => _isLoading = true);
 
-    final catsFuture = _categoryRepository.getCategoriesHierarchy();
-    final featuredFuture = _listingRepository.getFeaturedListings(limit: 10);
-    final recentFuture = _listingRepository.getRecentListings(limit: 20);
+    try {
+      final catsFuture = _categoryRepository.getCategoriesHierarchy();
+      final featuredFuture = _listingRepository.getFeaturedListings(limit: 10);
+      final recentFuture = _listingRepository.getRecentListings(limit: 30);
 
-    final results = await Future.wait([catsFuture, featuredFuture, recentFuture]);
+      final results = await Future.wait([catsFuture, featuredFuture, recentFuture]);
 
-    setState(() {
-      _categories = results[0] as List<CategoryModel>;
-      _featuredListings = results[1] as List<ListingModel>;
-      _recentListings = results[2] as List<ListingModel>;
-      _isLoading = false;
-    });
+      final cats = results[0] as List<CategoryModel>;
+      final featured = results[1] as List<ListingModel>;
+      final recent = results[2] as List<ListingModel>;
+
+      // Group recent listings by Category
+      final Map<String, List<ListingModel>> catMap = {};
+      for (final listing in recent) {
+        final catId = listing.categoryId ?? listing.category?.id;
+        if (catId != null && catId.isNotEmpty) {
+          catMap.putIfAbsent(catId, () => []).add(listing);
+        }
+      }
+
+      // Also for main categories that have subcategories, group subcategory listings under parent
+      for (final parent in cats) {
+        final subIds = parent.subcategories.map((s) => s.id).toSet();
+        if (subIds.isNotEmpty) {
+          final matching = recent.where((l) {
+            final cId = l.categoryId ?? l.category?.id ?? '';
+            final subId = l.subcategoryId ?? '';
+            return cId == parent.id || subIds.contains(cId) || subIds.contains(subId);
+          }).toList();
+          if (matching.isNotEmpty) {
+            catMap[parent.id] = matching;
+          }
+        }
+      }
+
+      setState(() {
+        _categories = cats;
+        _featuredListings = featured;
+        _recentListings = recent;
+        _categoryListings = catMap;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Load home data error: $e');
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -101,6 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      // Floating AI button strictly on Home Screen
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           Navigator.push(
@@ -247,6 +283,63 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 24),
                     ],
 
+                    // ── CATEGORY-WISE ROWS (ROW BY ROW LIKE WEBSITE) ──
+                    ..._categories.map((cat) {
+                      final catItems = _categoryListings[cat.id] ?? [];
+                      if (catItems.isEmpty) return const SizedBox.shrink();
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(_getCategoryIcon(cat.name), color: AppTheme.primaryColor, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    cat.name,
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ListingsSearchScreen(
+                                        initialCategoryId: cat.id,
+                                        initialCategoryName: cat.name,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: const Text('View All'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            height: 250,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: catItems.length,
+                              itemBuilder: (context, index) {
+                                return Container(
+                                  width: 180,
+                                  margin: const EdgeInsets.only(right: 12),
+                                  child: ListingCard(listing: catItems[index]),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                      );
+                    }),
+
                     // Recent Listings Header
                     const Text('Recent Listings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
@@ -276,10 +369,13 @@ class _HomeScreenState extends State<HomeScreen> {
   IconData _getCategoryIcon(String name) {
     final n = name.toLowerCase();
     if (n.contains('vehicle') || n.contains('car') || n.contains('auto')) return Icons.directions_car;
-    if (n.contains('mobile') || n.contains('phone')) return Icons.smartphone;
+    if (n.contains('mobile') || n.contains('phone') || n.contains('tech')) return Icons.smartphone;
+    if (n.contains('bike') || n.contains('motorcycle')) return Icons.two_wheeler;
     if (n.contains('real estate') || n.contains('property') || n.contains('house')) return Icons.home;
     if (n.contains('electronic') || n.contains('appliance')) return Icons.tv;
     if (n.contains('fashion') || n.contains('cloth')) return Icons.checkroom;
+    if (n.contains('furniture')) return Icons.chair;
+    if (n.contains('animal') || n.contains('pet')) return Icons.pets;
     if (n.contains('job')) return Icons.work;
     if (n.contains('service')) return Icons.build;
     return Icons.category;
