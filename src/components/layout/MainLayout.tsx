@@ -17,7 +17,7 @@ const MainLayout: React.FC = () => {
         <Outlet />
       </main>
       {showFooter && <Footer />}
-      <AIChatbotWidget />
+      {location.pathname === '/' && <AIChatbotWidget />}
     </div>
   );
 };

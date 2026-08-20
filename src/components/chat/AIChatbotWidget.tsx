@@ -1,10 +1,17 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Sparkles, MessageSquare, Bot } from 'lucide-react';
+import { Sparkles, Bot } from 'lucide-react';
 import { AIChatbotModal } from './AIChatbotModal';
 
 export const AIChatbotWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
+
+  // ONLY display floating AI button on the user's Home Page ('/')
+  if (location.pathname !== '/') {
+    return null;
+  }
 
   return (
     <>
