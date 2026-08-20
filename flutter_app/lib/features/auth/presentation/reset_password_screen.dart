@@ -5,11 +5,11 @@ import '../logic/auth_cubit.dart';
 import 'login_screen.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
-  final String email;
+  final String? email;
 
   const ResetPasswordScreen({
     super.key,
-    required this.email,
+    this.email,
   });
 
   @override

@@ -8,6 +8,8 @@ import 'features/listings/presentation/post_ad_screen.dart';
 import 'features/chat/presentation/chat_list_screen.dart';
 import 'features/favorites/presentation/favorites_screen.dart';
 import 'features/profile/presentation/profile_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'features/auth/presentation/reset_password_screen.dart';
 import 'features/notifications/services/push_notification_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -51,6 +53,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void initState() {
     super.initState();
     PushNotificationService.initialize(navigatorKey: navigatorKey);
+
+    // Listen to Supabase Auth state changes for password recovery via deep link
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.passwordRecovery) {
+        debugPrint('[Auth] Password recovery event detected');
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (_) => const ResetPasswordScreen(),
+          ),
+        );
+      }
+    });
   }
 
   final List<Widget> _screens = const [

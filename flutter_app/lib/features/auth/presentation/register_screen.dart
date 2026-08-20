@@ -133,6 +133,29 @@ class _RegisterScreenState extends State<RegisterScreen> with WidgetsBindingObse
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: Image.asset(
+                            'assets/images/app_logo.png',
+                            width: 68,
+                            height: 68,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
                     Text(
                       'Join All In One',
                       style: TextStyle(

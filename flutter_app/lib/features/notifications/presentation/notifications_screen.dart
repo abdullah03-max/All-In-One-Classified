@@ -166,16 +166,32 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ),
                   )
                 : ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                     itemCount: _notifications.length,
                     itemBuilder: (context, index) {
                       final notif = _notifications[index];
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
+                      final messageColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
 
                       return Container(
-                        color: notif.isRead ? Colors.transparent : AppTheme.primaryLight.withOpacity(0.3),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: notif.isRead
+                              ? (isDark ? const Color(0xFF1E293B).withOpacity(0.5) : Colors.white)
+                              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF)),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: notif.isRead
+                                ? (isDark ? const Color(0xFF334155).withOpacity(0.5) : Colors.grey.shade200)
+                                : (isDark ? const Color(0xFF3B82F6).withOpacity(0.4) : const Color(0xFF93C5FD)),
+                          ),
+                        ),
                         child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                           onTap: () => _handleNotificationTap(notif),
                           leading: CircleAvatar(
-                            backgroundColor: _getNotifColor(notif.type).withOpacity(0.2),
+                            backgroundColor: _getNotifColor(notif.type).withOpacity(0.18),
                             child: Icon(_getNotifIcon(notif.type), color: _getNotifColor(notif.type), size: 20),
                           ),
                           title: Row(
@@ -185,14 +201,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 child: Text(
                                   notif.title,
                                   style: TextStyle(
-                                    fontWeight: notif.isRead ? FontWeight.normal : FontWeight.bold,
+                                    fontWeight: notif.isRead ? FontWeight.w600 : FontWeight.bold,
                                     fontSize: 14,
+                                    color: titleColor,
                                   ),
                                 ),
                               ),
                               Text(
                                 timeFormat.format(notif.createdAt),
-                                style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600,
+                                ),
                               ),
                             ],
                           ),
@@ -200,7 +220,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
                               notif.message,
-                              style: const TextStyle(fontSize: 12, color: Colors.black87),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: messageColor,
+                                height: 1.35,
+                              ),
                             ),
                           ),
                         ),
