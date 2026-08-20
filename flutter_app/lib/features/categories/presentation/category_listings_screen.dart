@@ -35,6 +35,8 @@ class _CategoryListingsScreenState extends State<CategoryListingsScreen> {
   String? _selectedSubSubcategoryId;
   String? _selectedCity;
   String? _selectedCondition;
+  String? _selectedSex;
+  String? _selectedGender;
   double? _minPrice;
   double? _maxPrice;
   String _selectedSort = 'created_at_desc';
@@ -88,7 +90,7 @@ class _CategoryListingsScreenState extends State<CategoryListingsScreen> {
     return ids;
   }
 
-  CategoryModel? get _currentActiveCategoryModel {
+  CategoryModel get _currentActiveCategoryModel {
     if (_selectedSubSubcategoryId != null) {
       for (final sub in widget.category.subcategories) {
         for (final ss in sub.subcategories) {
@@ -104,12 +106,25 @@ class _CategoryListingsScreenState extends State<CategoryListingsScreen> {
     return widget.category;
   }
 
+  bool get _isJobOrService {
+    final n = _currentActiveCategoryModel.name.toLowerCase();
+    return n.contains('job') || n.contains('service');
+  }
+
   Future<void> _loadListings() async {
     setState(() {
       _isLoading = true;
       _page = 1;
       _listings = [];
     });
+
+    final combinedCustomFilters = Map<String, dynamic>.from(_customFilters);
+    if (_selectedSex != null && _selectedSex!.isNotEmpty) {
+      combinedCustomFilters['sex'] = _selectedSex;
+    }
+    if (_selectedGender != null && _selectedGender!.isNotEmpty) {
+      combinedCustomFilters['gender'] = _selectedGender;
+    }
 
     final results = await _repository.getCategoryTreeListings(
       categoryId: widget.category.id,
@@ -118,10 +133,10 @@ class _CategoryListingsScreenState extends State<CategoryListingsScreen> {
       selectedSubSubcategoryId: _selectedSubSubcategoryId,
       queryText: _searchController.text,
       city: _selectedCity,
-      condition: _selectedCondition,
-      minPrice: _minPrice,
-      maxPrice: _maxPrice,
-      customFilters: _customFilters,
+      condition: _isJobOrService ? null : _selectedCondition,
+      minPrice: _currentActiveCategoryModel.isPriceEnabled ? _minPrice : null,
+      maxPrice: _currentActiveCategoryModel.isPriceEnabled ? _maxPrice : null,
+      customFilters: combinedCustomFilters,
       sortBy: _selectedSort,
       page: 1,
     );
@@ -140,6 +155,14 @@ class _CategoryListingsScreenState extends State<CategoryListingsScreen> {
     setState(() => _isLoading = true);
 
     final nextPage = _page + 1;
+    final combinedCustomFilters = Map<String, dynamic>.from(_customFilters);
+    if (_selectedSex != null && _selectedSex!.isNotEmpty) {
+      combinedCustomFilters['sex'] = _selectedSex;
+    }
+    if (_selectedGender != null && _selectedGender!.isNotEmpty) {
+      combinedCustomFilters['gender'] = _selectedGender;
+    }
+
     final results = await _repository.getCategoryTreeListings(
       categoryId: widget.category.id,
       subcategoryIds: _allSubcategoryIds,
@@ -147,10 +170,10 @@ class _CategoryListingsScreenState extends State<CategoryListingsScreen> {
       selectedSubSubcategoryId: _selectedSubSubcategoryId,
       queryText: _searchController.text,
       city: _selectedCity,
-      condition: _selectedCondition,
-      minPrice: _minPrice,
-      maxPrice: _maxPrice,
-      customFilters: _customFilters,
+      condition: _isJobOrService ? null : _selectedCondition,
+      minPrice: _currentActiveCategoryModel.isPriceEnabled ? _minPrice : null,
+      maxPrice: _currentActiveCategoryModel.isPriceEnabled ? _maxPrice : null,
+      customFilters: combinedCustomFilters,
       sortBy: _selectedSort,
       page: nextPage,
     );
@@ -168,7 +191,9 @@ class _CategoryListingsScreenState extends State<CategoryListingsScreen> {
   int get _activeFiltersCount {
     int count = 0;
     if (_selectedCity != null && _selectedCity != 'All Cities') count++;
-    if (_selectedCondition != null) count++;
+    if (_selectedCondition != null && !_isJobOrService) count++;
+    if (_selectedSex != null) count++;
+    if (_selectedGender != null) count++;
     if (_minPrice != null || _maxPrice != null) count++;
     count += _customFilters.values.where((v) => v != null && v.toString().trim().isNotEmpty).length;
     return count;
@@ -351,6 +376,8 @@ class _CategoryListingsScreenState extends State<CategoryListingsScreen> {
                                   setState(() {
                                     _selectedCity = null;
                                     _selectedCondition = null;
+                                    _selectedSex = null;
+                                    _selectedGender = null;
                                     _minPrice = null;
                                     _maxPrice = null;
                                     _customFilters.clear();
@@ -395,8 +422,12 @@ class _CategoryListingsScreenState extends State<CategoryListingsScreen> {
   }
 
   void _showFilterModal() {
-    final activeCat = _currentActiveCategoryModel ?? widget.category;
+    final activeCat = _currentActiveCategoryModel;
     final customFields = activeCat.customFields;
+    final isPriceActive = activeCat.isPriceEnabled && !_isJobOrService;
+    final hasCondition = !_isJobOrService && (activeCat.conditionType != null);
+    final hasAnimalSex = activeCat.hasAnimalSex;
+    final hasHumanGender = activeCat.hasHumanGender;
 
     final minPriceCtrl = TextEditingController(text: _minPrice != null ? _minPrice!.toInt().toString() : '');
     final maxPriceCtrl = TextEditingController(text: _maxPrice != null ? _maxPrice!.toInt().toString() : '');
@@ -420,12 +451,14 @@ class _CategoryListingsScreenState extends State<CategoryListingsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Filter ${widget.category.name}', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+                    Text('Filter ${activeCat.name}', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
                     TextButton(
                       onPressed: () {
                         setState(() {
                           _selectedCity = null;
                           _selectedCondition = null;
+                          _selectedSex = null;
+                          _selectedGender = null;
                           _minPrice = null;
                           _maxPrice = null;
                           _customFilters.clear();
@@ -452,8 +485,8 @@ class _CategoryListingsScreenState extends State<CategoryListingsScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Price Range
-                if (widget.category.isPriceEnabled) ...[
+                // Price Range (Only for categories with price enabled)
+                if (isPriceActive) ...[
                   const Text('Price Range (PKR)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Row(
@@ -480,26 +513,73 @@ class _CategoryListingsScreenState extends State<CategoryListingsScreen> {
                   const SizedBox(height: 16),
                 ],
 
-                // Condition Filter
-                const Text('Condition', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: ['New', 'Used', 'Refurbished', 'Open Box'].map((c) {
-                    final isSelected = _selectedCondition?.toLowerCase() == c.toLowerCase();
-                    return FilterChip(
-                      label: Text(c),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        setState(() => _selectedCondition = selected ? c : null);
-                        setModalState(() {});
-                      },
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 18),
+                // Condition Filter (Only for physical goods categories)
+                if (hasCondition) ...[
+                  const Text('Condition', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: (activeCat.conditionType == 'simple'
+                            ? ['New', 'Used']
+                            : ['New', 'Used', 'Refurbished', 'Open Box'])
+                        .map((c) {
+                      final isSelected = _selectedCondition?.toLowerCase() == c.toLowerCase();
+                      return FilterChip(
+                        label: Text(c),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() => _selectedCondition = selected ? c : null);
+                          setModalState(() {});
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
 
-                // ── DYNAMIC CATEGORY SPECIFICATIONS FILTERS (From Admin) ──
+                // Animal Sex Filter (Only for Animals / Pets)
+                if (hasAnimalSex) ...[
+                  const Text('Sex (Animal)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: ['Male', 'Female', 'Pair'].map((s) {
+                      final isSelected = _selectedSex?.toLowerCase() == s.toLowerCase();
+                      return FilterChip(
+                        label: Text(s),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() => _selectedSex = selected ? s.toLowerCase() : null);
+                          setModalState(() {});
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Human Gender Filter
+                if (hasHumanGender) ...[
+                  const Text('Gender', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: ['Male', 'Female', 'Other'].map((g) {
+                      final isSelected = _selectedGender?.toLowerCase() == g.toLowerCase();
+                      return FilterChip(
+                        label: Text(g),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() => _selectedGender = selected ? g.toLowerCase() : null);
+                          setModalState(() {});
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // ── DYNAMIC CATEGORY SPECIFICATIONS FILTERS (From Admin Schema) ──
                 if (customFields.isNotEmpty) ...[
                   const Divider(),
                   const SizedBox(height: 8),

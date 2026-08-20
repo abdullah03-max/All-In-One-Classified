@@ -282,16 +282,79 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                     const SizedBox(height: 8),
                   ],
 
-                  // Price
-                  Text(
-                    currencyFormatter.format(listing.price),
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      color: priceColor,
+                  // Video Preview Banner
+                  if (listing.videoUrl != null && listing.videoUrl!.isNotEmpty) ...[
+                    InkWell(
+                      onTap: () async {
+                        final uri = Uri.parse(listing.videoUrl!);
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.35)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.play_circle_fill, color: Color(0xFF10B981), size: 28),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Watch Product Video', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                  Text('Tap to open video preview', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.open_in_new, size: 16, color: Color(0xFF10B981)),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
+                  ],
+
+                  // Price (Only for priced categories, hide PKR 0 for Jobs/Services)
+                  if (listing.price > 0 &&
+                      (listing.category == null ||
+                          (listing.category!.isPriceEnabled &&
+                              !listing.category!.name.toLowerCase().contains('job') &&
+                              !listing.category!.name.toLowerCase().contains('service')))) ...[
+                    Text(
+                      currencyFormatter.format(listing.price),
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: priceColor,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                  ] else if (listing.category != null &&
+                      (listing.category!.name.toLowerCase().contains('job') ||
+                          listing.category!.name.toLowerCase().contains('service'))) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Apply / Contact for Details',
+                        style: TextStyle(
+                          color: Color(0xFF10B981),
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
 
                   // Title
                   Text(
@@ -310,7 +373,10 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _buildMetaChip(context, Icons.info_outline, 'Condition: ${listing.condition.toUpperCase()}'),
+                      if (listing.category == null ||
+                          (!listing.category!.name.toLowerCase().contains('job') &&
+                              !listing.category!.name.toLowerCase().contains('service')))
+                        _buildMetaChip(context, Icons.info_outline, 'Condition: ${listing.condition.toUpperCase()}'),
                       _buildMetaChip(context, Icons.location_on_outlined, listing.city),
                       _buildMetaChip(context, Icons.remove_red_eye_outlined, '${listing.viewsCount} views'),
                       _buildMetaChip(context, Icons.calendar_today_outlined, dateFormatter.format(listing.createdAt)),

@@ -42,6 +42,7 @@ class _PostAdScreenState extends State<PostAdScreen> {
   bool _isNegotiable = true;
   bool _isSubmitting = false;
   bool _isLocating = false;
+  String _uploadStatus = '';
 
   // Images & Video
   final ImagePicker _picker = ImagePicker();
@@ -182,23 +183,33 @@ class _PostAdScreenState extends State<PostAdScreen> {
 
     _uploadedImageUrls.clear();
 
-    for (final xfile in _selectedImageFiles) {
-      final file = File(xfile.path);
-      final fileExt = xfile.path.split('.').last;
-      final fileName = '${user.id}/${DateTime.now().millisecondsSinceEpoch}_${_uploadedImageUrls.length}.$fileExt';
+    for (int i = 0; i < _selectedImageFiles.length; i++) {
+      final xfile = _selectedImageFiles[i];
+      if (mounted) {
+        setState(() => _uploadStatus = 'Uploading photo ${i + 1}/${_selectedImageFiles.length}...');
+      }
+
+      final bytes = await xfile.readAsBytes();
+      final fileExt = xfile.name.split('.').last.toLowerCase();
+      final mimeType = fileExt == 'png' ? 'image/png' : 'image/jpeg';
+      final fileName = '${user.id}/${DateTime.now().millisecondsSinceEpoch}_$i.$fileExt';
 
       try {
         await Supabase.instance.client.storage
-            .from('listings')
-            .upload(fileName, file);
+            .from('listing-images')
+            .uploadBinary(
+              fileName,
+              bytes,
+              fileOptions: FileOptions(contentType: mimeType, upsert: true),
+            );
 
         final publicUrl = Supabase.instance.client.storage
-            .from('listings')
+            .from('listing-images')
             .getPublicUrl(fileName);
 
         _uploadedImageUrls.add(publicUrl);
       } catch (e) {
-        print('Storage upload warning: $e');
+        print('Storage upload image error: $e');
       }
     }
   }
@@ -207,22 +218,30 @@ class _PostAdScreenState extends State<PostAdScreen> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null || _selectedVideoFile == null) return;
 
+    if (mounted) {
+      setState(() => _uploadStatus = 'Uploading product video...');
+    }
+
     try {
-      final file = File(_selectedVideoFile!.path);
-      final fileExt = _selectedVideoFile!.path.split('.').last;
+      final bytes = await _selectedVideoFile!.readAsBytes();
+      final fileExt = _selectedVideoFile!.name.split('.').last.toLowerCase();
       final fileName = 'videos/${user.id}/${DateTime.now().millisecondsSinceEpoch}_video.$fileExt';
 
       await Supabase.instance.client.storage
-          .from('listings')
-          .upload(fileName, file);
+          .from('listing-images')
+          .uploadBinary(
+            fileName,
+            bytes,
+            fileOptions: FileOptions(contentType: 'video/$fileExt', upsert: true),
+          );
 
       final publicUrl = Supabase.instance.client.storage
-          .from('listings')
+          .from('listing-images')
           .getPublicUrl(fileName);
 
       _uploadedVideoUrl = publicUrl;
     } catch (e) {
-      print('Video storage upload warning: $e');
+      print('Video storage upload error: $e');
     }
   }
 
@@ -242,14 +261,21 @@ class _PostAdScreenState extends State<PostAdScreen> {
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    setState(() {
+      _isSubmitting = true;
+      _uploadStatus = 'Uploading media...';
+    });
 
     try {
-      // 1. Upload Images & Video to Supabase Storage
+      // 1. Upload Images & Video to Supabase Storage ('listing-images' bucket)
       await _uploadImagesToSupabase();
       await _uploadVideoToSupabase();
 
-      // 2. Insert Listing Record into 'listings' table
+      if (mounted) {
+        setState(() => _uploadStatus = 'Saving ad details...');
+      }
+
+      // 2. Insert Listing Record into 'listings' table with status = 'pending'
       final assignedCategoryId = _selectedSubSubcategory?.id ?? _selectedSubcategory?.id ?? _selectedCategory!.id;
 
       final combinedAttributes = Map<String, dynamic>.from(_dynamicAttributes);
@@ -273,7 +299,7 @@ class _PostAdScreenState extends State<PostAdScreen> {
         'country': 'Pakistan',
         'is_negotiable': _isPriceEnabled ? _isNegotiable : false,
         'is_featured': false,
-        'status': 'active',
+        'status': 'pending', // Submits to moderator queue before going live
         'images': _uploadedImageUrls,
         'video_url': _uploadedVideoUrl,
         'attributes': combinedAttributes,
@@ -283,18 +309,25 @@ class _PostAdScreenState extends State<PostAdScreen> {
       await Supabase.instance.client.from('listings').insert(payload);
 
       if (mounted) {
-        setState(() => _isSubmitting = false);
+        setState(() {
+          _isSubmitting = false;
+          _uploadStatus = '';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('🎉 Your ad has been posted successfully and is now LIVE!'),
+            content: Text('🎉 Your ad has been submitted and is pending moderator approval!'),
             backgroundColor: Color(0xFF10B981),
+            duration: Duration(seconds: 4),
           ),
         );
         _resetForm();
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isSubmitting = false);
+        setState(() {
+          _isSubmitting = false;
+          _uploadStatus = '';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error posting ad: ${e.toString()}')),
         );
@@ -318,6 +351,7 @@ class _PostAdScreenState extends State<PostAdScreen> {
       _dynamicAttributes.clear();
       _selectedAnimalSex = null;
       _selectedHumanGender = null;
+      _uploadStatus = '';
     });
   }
 
@@ -665,7 +699,7 @@ class _PostAdScreenState extends State<PostAdScreen> {
                     OutlinedButton.icon(
                       onPressed: _pickVideo,
                       icon: const Icon(Icons.video_library, size: 18),
-                      label: Text(_selectedVideoFile != null ? 'Video Selected' : 'Add Product Video'),
+                      label: Text(_selectedVideoFile != null ? 'Video Attached' : 'Add Product Video'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF10B981),
                         side: const BorderSide(color: Color(0xFF10B981)),
@@ -757,7 +791,13 @@ class _PostAdScreenState extends State<PostAdScreen> {
                   ),
                 const SizedBox(height: 24),
                 if (_isSubmitting)
-                  const Center(child: CircularProgressIndicator())
+                  Column(
+                    children: [
+                      const Center(child: CircularProgressIndicator()),
+                      const SizedBox(height: 8),
+                      Text(_uploadStatus, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                    ],
+                  )
                 else
                   SizedBox(
                     width: double.infinity,

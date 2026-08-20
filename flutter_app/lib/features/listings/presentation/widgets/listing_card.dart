@@ -19,6 +19,13 @@ class ListingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final currencyFormatter = NumberFormat.currency(symbol: 'PKR ', decimalDigits: 0);
 
+    final isJobOrService = listing.category != null &&
+        (listing.category!.name.toLowerCase().contains('job') ||
+            listing.category!.name.toLowerCase().contains('service') ||
+            !listing.category!.isPriceEnabled);
+
+    final isNonPriced = listing.price == 0 || isJobOrService;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -79,8 +86,7 @@ class ListingCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(
-                              0xFFF59E0B), Color(0xFFD97706)],
+                          colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
                         ),
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -97,22 +103,23 @@ class ListingCard extends StatelessWidget {
                     ),
                   ),
 
-                // Condition Badge
-                Positioned(
-                  bottom: 8,
-                  left: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      listing.condition.toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600),
+                // Condition Badge (Only for non-job/non-service items)
+                if (!isJobOrService && listing.condition.isNotEmpty)
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        listing.condition.toUpperCase(),
+                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
-                ),
 
                 // Favorite Heart Toggle Button
                 Positioned(
@@ -150,14 +157,26 @@ class ListingCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    currencyFormatter.format(listing.price),
-                    style: const TextStyle(
-                      color: AppTheme.primaryColor,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
+
+                  if (!isNonPriced)
+                    Text(
+                      currencyFormatter.format(listing.price),
+                      style: const TextStyle(
+                        color: AppTheme.primaryColor,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    )
+                  else
+                    Text(
+                      isJobOrService ? 'Apply / Details' : 'Contact for Price',
+                      style: const TextStyle(
+                        color: Color(0xFF10B981),
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
+
                   const SizedBox(height: 8),
 
                   // Location City & Verification

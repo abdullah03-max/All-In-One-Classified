@@ -322,6 +322,20 @@ const ListingDetailPage: React.FC = () => {
                       Boolean(listing.subcategory_id?.startsWith('d1000000-0000-0000-0000-0000000001')) ||
                       Boolean(listing.subcategory_id?.startsWith('pr-'));
 
+                    const isJobOrService =
+                      listing.price === 0 ||
+                      listing.category?.slug?.includes('job') ||
+                      listing.category?.slug?.includes('service') ||
+                      (listing.category?.name && /job|service/i.test(listing.category.name));
+
+                    if (isJobOrService) {
+                      return (
+                        <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                          {listing.category?.name && /job/i.test(listing.category.name) ? 'Apply / Contact for Details' : 'Contact for Price'}
+                        </span>
+                      );
+                    }
+
                     return (
                       <>
                         <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
