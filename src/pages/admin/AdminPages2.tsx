@@ -489,13 +489,41 @@ export const AdminCategoriesPage: React.FC = () => {
   };
 
   // ============================================================
+  // SYNC ALL VIRTUAL CATEGORIES TO DATABASE
+  // ============================================================
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+
+  const handleSyncAllToDb = async () => {
+    if (!confirm('This will sync all standard categories, subcategories, and their schemas into Supabase database. Proceed?')) return;
+    setIsSyncingAll(true);
+    const toastId = toast.loading('Syncing categories to database...');
+    try {
+      const res = await categoriesService.syncAllToDatabase((msg) => {
+        toast.loading(msg, { id: toastId });
+      });
+      if (res.success) {
+        toast.success(`Successfully synced ${res.count} categories to Supabase database!`, { id: toastId });
+        fetchCategories();
+      } else {
+        toast.error('Sync failed: ' + (res.error?.message || 'Unknown error'), { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error('Sync error: ' + err.message, { id: toastId });
+    } finally {
+      setIsSyncingAll(false);
+    }
+  };
+
+  // ============================================================
   // DELETE CATEGORY
   // ============================================================
   const handleDeleteCategory = async (cat: Category) => {
     const directChildren = categories.filter(c => c.parent_id === cat.id);
     const directChildIds = directChildren.map(c => c.id);
     const grandChildren = categories.filter(c => c.parent_id && directChildIds.includes(c.parent_id));
+    const grandChildIds = grandChildren.map(c => c.id);
     const totalNested = directChildren.length + grandChildren.length;
+    const allIdsToDelete = [cat.id, ...directChildIds, ...grandChildIds];
 
     let confirmMsg = `Are you sure you want to delete category "${cat.name}"?`;
     if (totalNested > 0) {
@@ -504,17 +532,66 @@ export const AdminCategoriesPage: React.FC = () => {
 
     if (!confirm(confirmMsg)) return;
 
+    const toastId = toast.loading(`Deleting "${cat.name}"...`);
+
     try {
+      // 1. Resolve listings table foreign key constraints:
+      // A) Nullify subcategory_id in listings referencing any deleted ID
+      try {
+        await supabase
+          .from('listings')
+          .update({ subcategory_id: null })
+          .in('subcategory_id', allIdsToDelete);
+      } catch (err) {
+        console.warn('Subcategory FK update warning:', err);
+      }
+
+      // B) Reassign category_id in listings referencing any deleted ID to a safe fallback category
+      const remainingCats = categories.filter(c => !allIdsToDelete.includes(c.id));
+      const fallbackCat = remainingCats.find(c => !c.parent_id) || remainingCats[0];
+
+      if (fallbackCat) {
+        try {
+          await supabase
+            .from('listings')
+            .update({ category_id: fallbackCat.id })
+            .in('category_id', allIdsToDelete);
+        } catch (err) {
+          console.warn('Category FK update warning:', err);
+        }
+      }
+
+      // 2. Cascading delete from child sub-subcategories -> subcategories -> parent
+      if (grandChildIds.length > 0) {
+        await supabase.from('categories').delete().in('id', grandChildIds);
+        await supabase.from('categories').update({ is_active: false }).in('id', grandChildIds);
+      }
+      if (directChildIds.length > 0) {
+        await supabase.from('categories').delete().in('id', directChildIds);
+        await supabase.from('categories').update({ is_active: false }).in('id', directChildIds);
+      }
+
+      // 3. Delete / deactivate parent category
       const { error } = await supabase.from('categories').delete().eq('id', cat.id);
-      if (error) throw error;
-      toast.success(`Category "${cat.name}" deleted successfully`);
+      if (error) {
+        // If hard delete still hits any table constraint, perform soft delete
+        await supabase.from('categories').upsert({
+          id: cat.id,
+          name: cat.name,
+          slug: cat.slug,
+          is_active: false,
+        });
+      }
+
+      toast.success(`Category "${cat.name}" deleted successfully`, { id: toastId });
 
       if (selectedMainCatId === cat.id) setSelectedMainCatId(null);
       if (selectedSubCatId === cat.id) setSelectedSubCatId(null);
 
       fetchCategories();
     } catch (e: any) {
-      toast.error('Failed to delete category: ' + e.message);
+      console.error('Delete category error:', e);
+      toast.error('Failed to delete category: ' + e.message, { id: toastId });
     }
   };
 
@@ -584,6 +661,15 @@ export const AdminCategoriesPage: React.FC = () => {
                 Tree View
               </button>
             </div>
+
+            <button
+              onClick={handleSyncAllToDb}
+              disabled={isSyncingAll}
+              className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={isSyncingAll ? "animate-spin" : ""} />
+              {isSyncingAll ? 'Syncing...' : 'Sync All to Database'}
+            </button>
 
             <Button icon={<Plus size={16} />} onClick={() => handleStartAdd('')} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg">
               Add Category

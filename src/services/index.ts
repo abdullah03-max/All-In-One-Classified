@@ -161,17 +161,89 @@ export const categoriesService = {
         .select('*')
         .order('sort_order', { ascending: true });
 
-      if (error) {
-        console.error('getCategories database error:', error);
-        return [];
+      const allVirtualFlat = flattenVirtualCategories(CATEGORIES);
+
+      if (error || !dbCats || dbCats.length === 0) {
+        return allVirtualFlat;
       }
 
-      return (dbCats || []) as unknown as Category[];
+      // Merge DB records with virtual flat categories (DB records take precedence)
+      const mergedMap = new Map<string, Category>();
+
+      // 1. Put all DB records first
+      dbCats.forEach(c => {
+        if (c.is_active !== false) {
+          mergedMap.set(c.id, c as unknown as Category);
+        }
+      });
+
+      // 2. Add missing virtual categories if not overridden or deleted in DB
+      allVirtualFlat.forEach(vc => {
+        if (!mergedMap.has(vc.id)) {
+          const dbItem = dbCats.find(c => c.id === vc.id || c.slug === vc.slug);
+          if (!dbItem || dbItem.is_active !== false) {
+            mergedMap.set(vc.id, vc);
+          }
+        }
+      });
+
+      return Array.from(mergedMap.values()).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
     } catch (err) {
-      console.error('getCategories error:', err);
-      return [];
+      console.error('getCategories error, using fallback:', err);
+      return flattenVirtualCategories(CATEGORIES);
     }
   },
+
+  async syncAllToDatabase(progressCallback?: (msg: string) => void): Promise<{ success: boolean; count: number; error?: any }> {
+    try {
+      const allVirtualFlat = flattenVirtualCategories(CATEGORIES);
+      if (progressCallback) progressCallback(`Starting sync of ${allVirtualFlat.length} categories to database...`);
+
+      // Separate Level 1, Level 2, and Level 3 so parents exist before children
+      const level1 = allVirtualFlat.filter(c => !c.parent_id);
+      const level1Ids = new Set(level1.map(c => c.id));
+      const level2 = allVirtualFlat.filter(c => c.parent_id && level1Ids.has(c.parent_id));
+      const level2Ids = new Set(level2.map(c => c.id));
+      const level3 = allVirtualFlat.filter(c => c.parent_id && level2Ids.has(c.parent_id));
+
+      const formatPayload = (c: Category) => ({
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        icon: c.icon || 'Tag',
+        parent_id: c.parent_id || null,
+        description: c.description || null,
+        color: c.color || '#3b82f6',
+        sort_order: c.sort_order || 0,
+        is_active: true,
+        attributes_schema: (c as any).attributes_schema || [],
+        image_url: (c as any).image_url || null,
+      });
+
+      // 1. Level 1
+      if (progressCallback) progressCallback(`Upserting ${level1.length} main categories...`);
+      for (const cat of level1) {
+        await supabase.from('categories').upsert(formatPayload(cat), { onConflict: 'id' });
+      }
+
+      // 2. Level 2
+      if (progressCallback) progressCallback(`Upserting ${level2.length} subcategories...`);
+      for (const cat of level2) {
+        await supabase.from('categories').upsert(formatPayload(cat), { onConflict: 'id' });
+      }
+
+      // 3. Level 3
+      if (progressCallback) progressCallback(`Upserting ${level3.length} sub-subcategories...`);
+      for (const cat of level3) {
+        await supabase.from('categories').upsert(formatPayload(cat), { onConflict: 'id' });
+      }
+
+      return { success: true, count: allVirtualFlat.length };
+    } catch (err: any) {
+      console.error('syncAllToDatabase error:', err);
+      return { success: false, count: 0, error: err };
+    }
+  }
 };
 
 // ============================================================
