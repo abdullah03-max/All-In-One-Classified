@@ -251,7 +251,13 @@ export const AdminCategoriesPage: React.FC = () => {
     setSubSubCsvInput('');
 
     // Rehydrate Ad Details & Attributes
-    const schema = (cat as any).attributes_schema || [];
+    let schema = (cat as any).attributes_schema || [];
+    if (!Array.isArray(schema) || schema.length === 0) {
+      const subWithSchema = existingSubs.find(s => (s as any).attributes_schema && Array.isArray((s as any).attributes_schema) && (s as any).attributes_schema.length > 0);
+      if (subWithSchema) {
+        schema = (subWithSchema as any).attributes_schema;
+      }
+    }
     setPriceEnabled(getPriceEnabled(schema));
     setEnabledStandardIds(getEnabledStandardAttrIds(schema));
     setCustomAttributes(getCustomAttributesSchema(schema));

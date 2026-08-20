@@ -777,11 +777,112 @@ export const KIDS_ACCESSORIES_SCHEMA = [
   { name: 'age_suitability', label: 'Age Group', type: 'select', options: ['0-6 Months', '6-12 Months', '1-3 Years', '3-5 Years', '5-8 Years', '8-12 Years', '12+ Years'], required: false }
 ];
 
+export const CARS_SCHEMA = [
+  { name: 'make', label: 'Make / Brand', type: 'select', options: ['Toyota', 'Honda', 'Suzuki', 'Daihatsu', 'Nissan', 'Audi', 'BMW', 'Mercedes-Benz', 'Hyundai', 'KIA', 'Changan', 'MG', 'Haval', 'Peugeot', 'Proton', 'DFSK', 'FAW', 'Prince', 'Other'], required: true },
+  { name: 'model', label: 'Model', type: 'text', required: true },
+  { name: 'year', label: 'Year', type: 'select', options: ['2026', '2025', '2024', '2023', '2022', '2021', '2020', '2019', '2018', '2017', '2016', '2015', '2014', '2013', '2012', '2011', '2010', '2009', '2008', '2007', '2006', '2005', 'Older'], required: true },
+  { name: 'transmission', label: 'Transmission', type: 'select', options: ['Automatic', 'Manual'], required: true },
+  { name: 'fuel_type', label: 'Fuel Type', type: 'select', options: ['Petrol', 'Diesel', 'Hybrid', 'Electric', 'CNG', 'LPG'], required: true },
+  { name: 'registered_city', label: 'Registered In', type: 'select', options: ['Lahore', 'Karachi', 'Islamabad', 'Rawalpindi', 'Faisalabad', 'Multan', 'Peshawar', 'Un-registered'], required: false },
+  { name: 'mileage_km', label: 'Mileage (KM)', type: 'number', required: false },
+  { name: 'engine_capacity_cc', label: 'Engine Capacity (CC)', type: 'number', required: false },
+  { name: 'color', label: 'Color', type: 'text', required: false },
+  { name: 'assembly', label: 'Assembly', type: 'select', options: ['Local', 'Imported'], required: false },
+  { name: 'condition_full', label: 'Condition', type: 'select', options: ['New', 'Used', 'Open Box', 'Refurbished'], required: true, isStandard: true, standardId: 'condition_full' }
+];
+
+export const BIKES_SCHEMA = [
+  { name: 'make', label: 'Make / Brand', type: 'select', options: ['Honda', 'Yamaha', 'Suzuki', 'United', 'Road Prince', 'Super Power', 'Crown', 'Hi-Speed', 'Benelli', 'Unique', 'ZXMCO', 'Metro', 'Other'], required: true },
+  { name: 'model', label: 'Model', type: 'text', required: true },
+  { name: 'year', label: 'Year', type: 'select', options: ['2026', '2025', '2024', '2023', '2022', '2021', '2020', '2019', '2018', '2017', '2016', '2015', '2014', 'Older'], required: true },
+  { name: 'engine_capacity', label: 'Engine Capacity', type: 'select', options: ['70 cc', '100 cc', '110 cc', '125 cc', '150 cc', '200 cc', '250 cc', '500+ cc'], required: true },
+  { name: 'engine_type', label: 'Engine Type', type: 'select', options: ['4 Stroke', '2 Stroke', 'Electric'], required: false },
+  { name: 'registered_city', label: 'Registered City', type: 'select', options: ['Lahore', 'Karachi', 'Islamabad', 'Rawalpindi', 'Faisalabad', 'Multan', 'Peshawar', 'Un-registered'], required: false },
+  { name: 'mileage_km', label: 'Mileage (KM)', type: 'number', required: false },
+  { name: 'condition_full', label: 'Condition', type: 'select', options: ['New', 'Used', 'Open Box', 'Refurbished'], required: true, isStandard: true, standardId: 'condition_full' }
+];
+
+export const MOBILE_PHONES_SCHEMA = [
+  { name: 'brand', label: 'Brand', type: 'select', options: ['Apple / iPhone', 'Samsung', 'Xiaomi / Redmi', 'Vivo', 'Oppo', 'Realme', 'Infinix', 'Tecno', 'Google Pixel', 'OnePlus', 'Huawei', 'Honor', 'Sony', 'Motorola', 'Nokia', 'ZTE', 'Nothing Phone', 'XMobile', 'Other'], required: true },
+  { name: 'model', label: 'Model', type: 'text', required: true },
+  { name: 'pta_status', label: 'PTA Status', type: 'select', options: ['PTA Approved', 'Non PTA', 'Factory Unlocked', 'Custom Paid', 'JV / Patch'], required: true },
+  { name: 'storage', label: 'Storage', type: 'select', options: ['16 GB', '32 GB', '64 GB', '128 GB', '256 GB', '512 GB', '1 TB'], required: true },
+  { name: 'ram', label: 'RAM', type: 'select', options: ['2 GB', '3 GB', '4 GB', '6 GB', '8 GB', '12 GB', '16 GB', '24 GB'], required: true },
+  { name: 'color', label: 'Color', type: 'text', required: false },
+  { name: 'warranty', label: 'Warranty', type: 'select', options: ['No Warranty', 'Brand Warranty', 'Local Warranty', 'International Warranty'], required: false },
+  { name: 'condition_full', label: 'Condition', type: 'select', options: ['New', 'Used', 'Open Box', 'Refurbished', 'For Parts / Not Working'], required: true, isStandard: true, standardId: 'condition_full' }
+];
+
+export const TABLETS_SCHEMA = [
+  { name: 'brand', label: 'Brand', type: 'select', options: ['Apple iPad', 'Samsung Galaxy Tab', 'Lenovo Tab', 'Huawei MatePad', 'Amazon Fire', 'Xiaomi Pad', 'Microsoft Surface', 'Other'], required: true },
+  { name: 'model', label: 'Model', type: 'text', required: true },
+  { name: 'pta_status', label: 'PTA Status / Connectivity', type: 'select', options: ['Wi-Fi Only', 'Wi-Fi + Cellular (PTA Approved)', 'Wi-Fi + Cellular (Non-PTA)'], required: true },
+  { name: 'storage', label: 'Storage', type: 'select', options: ['32 GB', '64 GB', '128 GB', '256 GB', '512 GB', '1 TB', '2 TB'], required: true },
+  { name: 'ram', label: 'RAM', type: 'select', options: ['2 GB', '3 GB', '4 GB', '6 GB', '8 GB', '16 GB'], required: true },
+  { name: 'screen_size', label: 'Screen Size', type: 'select', options: ['7-8 inch', '9-10 inch', '11-12 inch', '12.9+ inch'], required: false },
+  { name: 'color', label: 'Color', type: 'text', required: false },
+  { name: 'warranty', label: 'Warranty', type: 'select', options: ['No Warranty', 'Brand Warranty', 'Local Warranty'], required: false },
+  { name: 'condition_full', label: 'Condition', type: 'select', options: ['New', 'Used', 'Open Box', 'Refurbished'], required: true, isStandard: true, standardId: 'condition_full' }
+];
+
+export const LAPTOPS_SCHEMA = [
+  { name: 'brand', label: 'Brand / Make', type: 'select', options: ['Dell', 'HP', 'Lenovo', 'Apple / MacBook', 'Asus', 'Acer', 'MSI', 'Razer', 'Microsoft Surface', 'Toshiba', 'Samsung', 'Other'], required: true },
+  { name: 'model', label: 'Model', type: 'text', required: true },
+  { name: 'processor', label: 'Processor', type: 'select', options: ['Intel Core i3', 'Intel Core i5', 'Intel Core i7', 'Intel Core i9', 'Intel Xeon', 'AMD Ryzen 3', 'AMD Ryzen 5', 'AMD Ryzen 7', 'AMD Ryzen 9', 'Apple M1', 'Apple M2', 'Apple M3', 'Apple M4', 'Other'], required: true },
+  { name: 'generation', label: 'Generation', type: 'select', options: ['4th Gen', '5th Gen', '6th Gen', '7th Gen', '8th Gen', '9th Gen', '10th Gen', '11th Gen', '12th Gen', '13th Gen', '14th Gen', 'Apple Silicon', 'Other'], required: false },
+  { name: 'ram', label: 'RAM', type: 'select', options: ['4 GB', '8 GB', '16 GB', '32 GB', '64 GB', '128 GB'], required: true },
+  { name: 'storage_type', label: 'Storage Type', type: 'select', options: ['SSD (Solid State Drive)', 'NVMe SSD', 'HDD (Hard Disk Drive)', 'Hybrid (SSD + HDD)'], required: true },
+  { name: 'storage_capacity', label: 'Storage Capacity', type: 'select', options: ['128 GB', '256 GB', '512 GB', '1 TB', '2 TB', '4 TB+'], required: true },
+  { name: 'screen_size', label: 'Screen Size', type: 'select', options: ['11.6 inch', '12.5 inch', '13.3 inch', '14.0 inch', '15.6 inch', '16.0 inch', '17.3 inch'], required: false },
+  { name: 'graphics', label: 'Graphics Card', type: 'select', options: ['Integrated Graphics (Intel/AMD/Apple)', 'NVIDIA GeForce GTX', 'NVIDIA GeForce RTX', 'AMD Radeon Dedicated', 'NVIDIA Quadro / Workstation'], required: false },
+  { name: 'condition_full', label: 'Condition', type: 'select', options: ['New', 'Used', 'Open Box', 'Refurbished'], required: true, isStandard: true, standardId: 'condition_full' }
+];
+
+export const COMPUTERS_SCHEMA = [
+  { name: 'type', label: 'Computer Type', type: 'select', options: ['Desktop PC Tower', 'All-in-One (AIO)', 'Gaming PC', 'Workstation', 'Mini PC', 'Server'], required: true },
+  { name: 'brand', label: 'Brand', type: 'select', options: ['Custom Build', 'Dell', 'HP', 'Lenovo', 'Apple iMac / Mac Mini', 'Asus', 'Acer', 'Other'], required: true },
+  { name: 'processor', label: 'Processor', type: 'select', options: ['Intel Core i3', 'Intel Core i5', 'Intel Core i7', 'Intel Core i9', 'Intel Xeon', 'AMD Ryzen 3', 'AMD Ryzen 5', 'AMD Ryzen 7', 'AMD Ryzen 9', 'Apple Silicon', 'Other'], required: true },
+  { name: 'ram', label: 'RAM', type: 'select', options: ['4 GB', '8 GB', '16 GB', '32 GB', '64 GB', '128 GB'], required: true },
+  { name: 'storage_capacity', label: 'Storage Capacity', type: 'select', options: ['128 GB', '256 GB', '512 GB', '1 TB', '2 TB', '4 TB+'], required: true },
+  { name: 'graphics', label: 'Graphics Card', type: 'select', options: ['Integrated Graphics', 'NVIDIA GeForce GTX', 'NVIDIA GeForce RTX', 'AMD Radeon Dedicated', 'No GPU'], required: false },
+  { name: 'condition_full', label: 'Condition', type: 'select', options: ['New', 'Used', 'Open Box', 'Refurbished'], required: true, isStandard: true, standardId: 'condition_full' }
+];
+
+export const CAMERAS_SCHEMA = [
+  { name: 'brand', label: 'Brand', type: 'select', options: ['Canon', 'Nikon', 'Sony', 'Fujifilm', 'Panasonic / Lumix', 'GoPro', 'DJI', 'Olympus', 'Leica', 'Other'], required: true },
+  { name: 'camera_type', label: 'Camera Type', type: 'select', options: ['DSLR', 'Mirrorless', 'Action / Sports Camera', 'Drone Camera', 'Compact / Point & Shoot', 'Camcorder / Video', 'Security / CCTV Camera', 'Vintage / Film Camera'], required: true },
+  { name: 'megapixels', label: 'Megapixels / Resolution', type: 'select', options: ['12-16 MP', '18-24 MP', '26-36 MP', '45+ MP', '4K Video', '8K Video'], required: false },
+  { name: 'lens_included', label: 'Lens Included', type: 'select', options: ['Body Only', 'With Kit Lens', 'With Multiple Lenses'], required: false },
+  { name: 'condition_full', label: 'Condition', type: 'select', options: ['New', 'Used', 'Open Box', 'Refurbished'], required: true, isStandard: true, standardId: 'condition_full' }
+];
+
+export const GAMING_CONSOLES_SCHEMA = [
+  { name: 'brand', label: 'Platform / Brand', type: 'select', options: ['Sony PlayStation', 'Microsoft Xbox', 'Nintendo', 'Valve Steam Deck', 'ASUS ROG Ally', 'VR Headset (Oculus/Meta/PSVR)', 'Retro Console', 'Other'], required: true },
+  { name: 'model', label: 'Console Model', type: 'select', options: ['PlayStation 5', 'PlayStation 5 Slim / Pro', 'PlayStation 4 Pro', 'PlayStation 4 Slim', 'PlayStation 4', 'PlayStation 3', 'Xbox Series X', 'Xbox Series S', 'Xbox One X', 'Xbox One S', 'Nintendo Switch OLED', 'Nintendo Switch V2', 'Nintendo Switch Lite', 'Meta Quest 2 / 3', 'Other'], required: true },
+  { name: 'storage', label: 'Storage', type: 'select', options: ['500 GB', '825 GB', '1 TB', '2 TB', 'Custom / Upgraded'], required: false },
+  { name: 'controllers_count', label: 'Controllers Included', type: 'select', options: ['1 Controller', '2 Controllers', '3+ Controllers', 'No Controller (Console Only)'], required: false },
+  { name: 'condition_full', label: 'Condition', type: 'select', options: ['New', 'Used', 'Open Box', 'Refurbished'], required: true, isStandard: true, standardId: 'condition_full' }
+];
+
+export const SMART_WATCHES_SCHEMA = [
+  { name: 'brand', label: 'Brand', type: 'select', options: ['Apple Watch', 'Samsung Galaxy Watch', 'Huawei Watch', 'Xiaomi / Amazfit', 'Haylou', 'Fossil', 'Garmin', 'Kieslect', 'Realme', 'Other'], required: true },
+  { name: 'compatibility', label: 'Operating System Compatibility', type: 'select', options: ['iOS & Android', 'iOS Only (Apple Watch)', 'Android Only'], required: false },
+  { name: 'features', label: 'Key Features', type: 'select', options: ['Calling / Bluetooth Call', 'GPS & Heart Rate', 'Cellular (eSIM)', 'Waterproof / Swim Proof'], required: false },
+  { name: 'condition_full', label: 'Condition', type: 'select', options: ['New', 'Used', 'Open Box'], required: true, isStandard: true, standardId: 'condition_full' }
+];
+
+export const TECH_ACCESSORIES_SCHEMA = [
+  { name: 'type', label: 'Accessory Type', type: 'select', options: ['Headphones / Earbuds / AirPods', 'Chargers & Cables', 'Power Banks', 'Covers & Cases', 'Screen Protectors', 'Keyboards & Mouse', 'Speakers', 'Memory Cards & USB Drives', 'Smart Bands', 'Other'], required: true },
+  { name: 'brand', label: 'Brand', type: 'text', required: false },
+  { name: 'compatibility', label: 'Compatible With', type: 'text', required: false },
+  { name: 'condition_full', label: 'Condition', type: 'select', options: ['New', 'Used', 'Open Box'], required: true, isStandard: true, standardId: 'condition_full' }
+];
+
 export const CATEGORIES: Category[] = [
-  { id: 'c1000000-0000-0000-0000-000000000001', name: 'Vehicles', slug: 'vehicles', icon: 'Car', color: '#ef4444',
+  { id: 'c1000000-0000-0000-0000-000000000001', name: 'Vehicles', slug: 'vehicles', icon: 'Car', color: '#ef4444', attributes_schema: CARS_SCHEMA,
     subcategories: [
-      { id: 'c1000000-0000-0000-0000-000000000101', name: 'Cars', slug: 'cars', icon: 'Car', color: '#ef4444' },
-      { id: 'c1000000-0000-0000-0000-000000000181', name: 'Cars on Installments', slug: 'cars-on-installments', icon: 'Clock', color: '#ef4444' },
+      { id: 'c1000000-0000-0000-0000-000000000101', name: 'Cars', slug: 'cars', icon: 'Car', color: '#ef4444', attributes_schema: CARS_SCHEMA },
+      { id: 'c1000000-0000-0000-0000-000000000181', name: 'Cars on Installments', slug: 'cars-on-installments', icon: 'Clock', color: '#ef4444', attributes_schema: CARS_SCHEMA },
       { id: 'c1000000-0000-0000-0000-000000000182', name: 'Car Care', slug: 'car-care', icon: 'Wrench', color: '#ef4444',
         subcategories: [
           { id: 'c1000000-0000-0000-0000-000000000251', name: 'Pressure Washers', slug: 'pressure-washers', icon: 'Wrench', color: '#ef4444' },
@@ -880,9 +981,9 @@ export const CATEGORIES: Category[] = [
       { id: 'c1000000-0000-0000-0000-000000000106', name: 'Other Vehicles', slug: 'other-vehicles', icon: 'Car', color: '#ef4444' },
     ]
   },
-  { id: 'c1000000-0000-0000-0000-000000000099', name: 'Bikes', slug: 'bikes', icon: 'Bike', color: '#f97316',
+  { id: 'c1000000-0000-0000-0000-000000000099', name: 'Bikes', slug: 'bikes', icon: 'Bike', color: '#f97316', attributes_schema: BIKES_SCHEMA,
     subcategories: [
-      { id: '4b79486b-2af9-4775-9fa1-7f5d477401ff', name: 'Motorcycles', slug: 'motorcycles', icon: 'Bike', color: '#f97316',
+      { id: '4b79486b-2af9-4775-9fa1-7f5d477401ff', name: 'Motorcycles', slug: 'motorcycles', icon: 'Bike', color: '#f97316', attributes_schema: BIKES_SCHEMA,
         subcategories: [
           { id: 'c1000000-0000-0000-0000-000000000361', name: 'Standard Bikes', slug: 'standard-bikes', icon: 'Bike', color: '#f97316' },
           { id: 'c1000000-0000-0000-0000-000000000362', name: 'Electric Bikes', slug: 'electric-bikes', icon: 'Zap', color: '#f97316' },
@@ -985,16 +1086,16 @@ export const CATEGORIES: Category[] = [
       { id: 'd1000000-0000-0000-0000-000000000108', name: 'Land & Plots', slug: 'rent-land-plots', icon: 'Map', color: '#7c3aed' },
     ]
   },
-  { id: 'c1000000-0000-0000-0000-000000000003', name: 'Mobile & Tech products', slug: 'mobile-tech-products', icon: 'Smartphone', color: '#3b82f6',
+  { id: 'c1000000-0000-0000-0000-000000000003', name: 'Mobile & Tech products', slug: 'mobile-tech-products', icon: 'Smartphone', color: '#3b82f6', attributes_schema: MOBILE_PHONES_SCHEMA,
     subcategories: [
-      { id: 'c1000000-0000-0000-0000-000000000112', name: 'Mobile Phones', slug: 'mobile-phones', icon: 'Smartphone', color: '#3b82f6' },
-      { id: 'c1000000-0000-0000-0000-000000000113', name: 'Tablets', slug: 'tablets', icon: 'Tablet', color: '#3b82f6' },
-      { id: 'c1000000-0000-0000-0000-000000000114', name: 'Laptops', slug: 'laptops', icon: 'Laptop', color: '#3b82f6' },
-      { id: 'c1000000-0000-0000-0000-000000000115', name: 'Computers', slug: 'computers', icon: 'Monitor', color: '#3b82f6' },
-      { id: 'c1000000-0000-0000-0000-000000000116', name: 'Cameras', slug: 'cameras', icon: 'Camera', color: '#3b82f6' },
-      { id: 'c1000000-0000-0000-0000-000000000117', name: 'Gaming Consoles', slug: 'gaming-consoles', icon: 'Gamepad2', color: '#3b82f6' },
-      { id: 'c1000000-0000-0000-0000-000000000118', name: 'Accessories', slug: 'electronics-accessories', icon: 'Headphones', color: '#3b82f6' },
-      { id: 'c1000000-0000-0000-0000-000000000199', name: 'Smart Watches', slug: 'smart-watches', icon: 'Watch', color: '#3b82f6' },
+      { id: 'c1000000-0000-0000-0000-000000000112', name: 'Mobile Phones', slug: 'mobile-phones', icon: 'Smartphone', color: '#3b82f6', attributes_schema: MOBILE_PHONES_SCHEMA },
+      { id: 'c1000000-0000-0000-0000-000000000113', name: 'Tablets', slug: 'tablets', icon: 'Tablet', color: '#3b82f6', attributes_schema: TABLETS_SCHEMA },
+      { id: 'c1000000-0000-0000-0000-000000000114', name: 'Laptops', slug: 'laptops', icon: 'Laptop', color: '#3b82f6', attributes_schema: LAPTOPS_SCHEMA },
+      { id: 'c1000000-0000-0000-0000-000000000115', name: 'Computers', slug: 'computers', icon: 'Monitor', color: '#3b82f6', attributes_schema: COMPUTERS_SCHEMA },
+      { id: 'c1000000-0000-0000-0000-000000000116', name: 'Cameras', slug: 'cameras', icon: 'Camera', color: '#3b82f6', attributes_schema: CAMERAS_SCHEMA },
+      { id: 'c1000000-0000-0000-0000-000000000117', name: 'Gaming Consoles', slug: 'gaming-consoles', icon: 'Gamepad2', color: '#3b82f6', attributes_schema: GAMING_CONSOLES_SCHEMA },
+      { id: 'c1000000-0000-0000-0000-000000000118', name: 'Accessories', slug: 'electronics-accessories', icon: 'Headphones', color: '#3b82f6', attributes_schema: TECH_ACCESSORIES_SCHEMA },
+      { id: 'c1000000-0000-0000-0000-000000000199', name: 'Smart Watches', slug: 'smart-watches', icon: 'Watch', color: '#3b82f6', attributes_schema: SMART_WATCHES_SCHEMA },
     ]
   },
   { id: 'c1000000-0000-0000-0000-000000000004', name: 'Jobs', slug: 'jobs', icon: 'Briefcase', color: '#10b981',

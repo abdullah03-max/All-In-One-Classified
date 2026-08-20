@@ -101,20 +101,35 @@ export const getPriceEnabled = (attributesSchema: any = []): boolean => {
  * Extracts enabled standard attribute IDs from a category's attributes_schema array.
  */
 export const getEnabledStandardAttrIds = (attributesSchema: any[] = []): string[] => {
-  if (!Array.isArray(attributesSchema)) return [];
+  if (!Array.isArray(attributesSchema) || attributesSchema.length === 0) {
+    return ['condition_full']; // Default condition active for categories
+  }
   
   const enabledIds: string[] = [];
   attributesSchema.forEach(field => {
-    if (!field || field._type === '__category_config__') return;
-    if (field.isStandard || field.is_standard) {
-      const stdId = field.standardId || field.standard_id || field.name;
+    if (!field || field._type === '__category_config__' || field.name === '__price_config__') return;
+    const stdId = field.standardId || field.standard_id || field.name;
+    if (stdId === 'condition_full' || stdId === 'condition') {
+      enabledIds.push('condition_full');
+    } else if (stdId === 'condition_simple') {
+      enabledIds.push('condition_simple');
+    } else if (stdId === 'animal_sex' || stdId === 'sex') {
+      enabledIds.push('animal_sex');
+    } else if (stdId === 'human_gender' || stdId === 'gender') {
+      enabledIds.push('human_gender');
+    } else if (field.isStandard || field.is_standard) {
       if (stdId && STANDARD_ATTRIBUTES[stdId]) {
         enabledIds.push(stdId);
       }
     }
   });
 
-  return Array.from(new Set(enabledIds));
+  const res = Array.from(new Set(enabledIds));
+  // If nothing explicitly checked and not disabled, provide condition_full
+  if (res.length === 0 && getPriceEnabled(attributesSchema)) {
+    return ['condition_full'];
+  }
+  return res;
 };
 
 /**
@@ -122,13 +137,31 @@ export const getEnabledStandardAttrIds = (attributesSchema: any[] = []): string[
  */
 export const getCustomAttributesSchema = (attributesSchema: any[] = []): CustomAttributeDef[] => {
   if (!Array.isArray(attributesSchema)) return [];
-  return attributesSchema.filter(field => 
-    field && 
-    field._type !== '__category_config__' && 
-    field.name !== '__price_config__' &&
-    !field.isStandard && 
-    !field.is_standard
-  );
+  const standardNames = new Set([
+    '__category_config__', '__price_config__',
+    'condition_full', 'condition_simple', 'condition',
+    'animal_sex', 'sex',
+    'human_gender', 'gender'
+  ]);
+
+  return attributesSchema
+    .filter(field => 
+      field && 
+      field._type !== '__category_config__' && 
+      field.name !== '__price_config__' &&
+      !standardNames.has(field.name) &&
+      !standardNames.has(field.standardId) &&
+      !field.isStandard && 
+      !field.is_standard
+    )
+    .map(field => ({
+      name: field.name,
+      label: field.label || field.name,
+      type: (field.type || 'text') as 'select' | 'text' | 'number' | 'checkbox' | 'radio',
+      required: Boolean(field.required),
+      options: Array.isArray(field.options) ? field.options.map(String) : [],
+      isStandard: false
+    }));
 };
 
 /**
