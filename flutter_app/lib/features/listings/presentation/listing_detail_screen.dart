@@ -42,6 +42,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   int _currentImageIndex = 0;
   bool _isFavorite = false;
   bool _isStartingChat = false;
+  late int _viewsCount;
   final ListingRepository _listingRepository = ListingRepository();
   final FavoriteRepository _favoriteRepository = FavoriteRepository();
   final ChatRepository _chatRepository = ChatRepository();
@@ -50,7 +51,20 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   void initState() {
     super.initState();
     _isFavorite = widget.listing.isFavorite;
-    _listingRepository.incrementViews(widget.listing.id);
+    _viewsCount = widget.listing.viewsCount;
+    _recordView();
+  }
+
+  void _recordView() async {
+    final recorded = await _listingRepository.recordUniqueView(
+      widget.listing.id,
+      sellerId: widget.listing.sellerId,
+    );
+    if (recorded && mounted) {
+      setState(() {
+        _viewsCount++;
+      });
+    }
   }
 
   void _toggleFavorite() async {
@@ -378,7 +392,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                               !listing.category!.name.toLowerCase().contains('service')))
                         _buildMetaChip(context, Icons.info_outline, 'Condition: ${listing.condition.toUpperCase()}'),
                       _buildMetaChip(context, Icons.location_on_outlined, listing.city),
-                      _buildMetaChip(context, Icons.remove_red_eye_outlined, '${listing.viewsCount} views'),
+                      _buildMetaChip(context, Icons.remove_red_eye_outlined, '$_viewsCount views'),
                       _buildMetaChip(context, Icons.calendar_today_outlined, dateFormatter.format(listing.createdAt)),
                     ],
                   ),

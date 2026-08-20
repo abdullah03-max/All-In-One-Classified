@@ -14,6 +14,7 @@ import 'verification_application_screen.dart';
 import '../../ai_assistant/presentation/ai_assistant_screen.dart';
 import '../../help/presentation/help_center_screen.dart';
 import '../../help/presentation/safety_tips_screen.dart';
+import '../../help/presentation/about_app_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -124,13 +125,34 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.info_outline,
             title: 'About App',
             subtitle: 'All In One Marketplace v1.0',
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AboutAppScreen()),
+              );
+            },
           ),
           _buildProfileOption(
             icon: Icons.help_outline,
-            title: 'Help & Support',
-            subtitle: 'Contact support & safety guidelines',
-            onTap: () {},
+            title: 'Help Center & Support',
+            subtitle: 'Search FAQs & contact support team',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HelpCenterScreen()),
+              );
+            },
+          ),
+          _buildProfileOption(
+            icon: Icons.shield_outlined,
+            title: 'Safety Guidelines',
+            subtitle: 'Tips for safe trading across Pakistan',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SafetyTipsScreen()),
+              );
+            },
           ),
         ],
       ),
@@ -307,12 +329,23 @@ class ProfileScreen extends StatelessWidget {
           ),
           _buildProfileOption(
             icon: Icons.shield_outlined,
-            title: 'Safety Tips',
-            subtitle: 'Guidelines for safe buying & selling',
+            title: 'Safety Guidelines',
+            subtitle: 'Tips for safe trading across Pakistan',
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const SafetyTipsScreen()),
+              );
+            },
+          ),
+          _buildProfileOption(
+            icon: Icons.info_outline,
+            title: 'About App',
+            subtitle: 'All In One Marketplace v1.0',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AboutAppScreen()),
               );
             },
           ),

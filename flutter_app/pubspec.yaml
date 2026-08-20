@@ -22,6 +22,7 @@ dependencies:
   
   # Security & Storage
   flutter_secure_storage: ^9.2.0
+  shared_preferences: ^2.3.2
   
   # Media & Picker
   image_picker: ^1.1.2

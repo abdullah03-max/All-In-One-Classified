@@ -521,7 +521,41 @@ export const listingsService = {
     };
   },
 
-  async getListing(id: string): Promise<Listing> {
+  async recordUniqueView(id: string, viewerId?: string, sellerId?: string): Promise<boolean> {
+    try {
+      // Do not count seller viewing their own listing
+      if (viewerId && sellerId && viewerId === sellerId) {
+        return false;
+      }
+
+      const cacheKey = `viewed_listings_${viewerId || 'guest'}`;
+      let viewedList: string[] = [];
+      try {
+        const stored = localStorage.getItem(cacheKey);
+        if (stored) viewedList = JSON.parse(stored);
+      } catch (_) {}
+
+      if (viewedList.includes(id)) {
+        return false;
+      }
+
+      viewedList.push(id);
+      if (viewedList.length > 500) {
+        viewedList = viewedList.slice(-500);
+      }
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(viewedList));
+      } catch (_) {}
+
+      await supabase.rpc('increment_view_count', { listing_id: id });
+      return true;
+    } catch (e) {
+      console.error('Error recording unique view:', e);
+      return false;
+    }
+  },
+
+  async getListing(id: string, viewerId?: string): Promise<Listing> {
     const { data, error } = await supabase
       .from('listings')
       .select(`
@@ -533,8 +567,11 @@ export const listingsService = {
       .single();
     if (error) throw error;
     
-    // Increment view count
-    await supabase.rpc('increment_view_count', { listing_id: id });
+    // Increment view count only if unique view
+    const wasNewView = await this.recordUniqueView(id, viewerId, data.seller_id);
+    if (wasNewView) {
+      data.views_count = (data.views_count || 0) + 1;
+    }
     
     return data as unknown as Listing;
   },

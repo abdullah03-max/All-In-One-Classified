@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'listing_model.dart';
 
 class ListingRepository {
@@ -257,10 +259,45 @@ class ListingRepository {
     return 'good';
   }
 
-  /// Increments views count using Supabase RPC increment_listing_views
-  Future<void> incrementViews(String listingId) async {
+  /// Records a unique ad view using Supabase RPC increment_view_count with per-user/device deduplication
+  Future<bool> recordUniqueView(String listingId, {String? sellerId}) async {
     try {
-      await _client.rpc('increment_listing_views', params: {'listing_id': listingId});
-    } catch (_) {}
+      final user = _client.auth.currentUser;
+      final userId = user?.id;
+
+      // Do not count seller's own views
+      if (userId != null && sellerId != null && userId == sellerId) {
+        return false;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final cacheKey = 'viewed_listings_${userId ?? "guest"}';
+      final viewedList = prefs.getStringList(cacheKey) ?? [];
+
+      if (viewedList.contains(listingId)) {
+        // Already viewed by this account/device
+        return false;
+      }
+
+      // Add to local viewed cache
+      viewedList.add(listingId);
+      if (viewedList.length > 500) {
+        viewedList.removeRange(0, viewedList.length - 500);
+      }
+      await prefs.setStringList(cacheKey, viewedList);
+
+      // Call Supabase RPC increment_view_count
+      await _client.rpc('increment_view_count', params: {'listing_id': listingId});
+      debugPrint('[ViewTracker] Unique view recorded for listing: $listingId');
+      return true;
+    } catch (e) {
+      debugPrint('[ViewTracker] Error recording view: $e');
+      return false;
+    }
+  }
+
+  /// Increments views count
+  Future<void> incrementViews(String listingId, {String? sellerId}) async {
+    await recordUniqueView(listingId, sellerId: sellerId);
   }
 }

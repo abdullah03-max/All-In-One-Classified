@@ -53,7 +53,7 @@ const ListingDetailPage: React.FC = () => {
       if (!id) return;
       setLoading(true);
       try {
-        const data = await listingsService.getListing(id);
+        const data = await listingsService.getListing(id, user?.id);
         setListing(data);
 
         // Check bookmark

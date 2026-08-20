@@ -298,10 +298,10 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                                               icon: const Icon(Icons.refresh, size: 15, color: Color(0xFF10B981)),
                                               label: const Text('Re-activate', style: TextStyle(color: Color(0xFF10B981), fontSize: 12)),
                                             ),
-                                          IconButton(
-                                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                                            tooltip: 'Delete Listing',
+                                          TextButton.icon(
                                             onPressed: () => _deleteListing(listing.id),
+                                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 15),
+                                            label: const Text('Delete', style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
                                           ),
                                         ],
                                       ),
