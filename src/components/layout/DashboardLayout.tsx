@@ -99,11 +99,39 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, navItems, t
     return location.pathname === to || (to !== '/dashboard' && location.pathname.startsWith(to + '/'));
   };
 
+  const isManagementRoute =
+    location.pathname.startsWith('/admin') ||
+    location.pathname.startsWith('/superadmin') ||
+    location.pathname.startsWith('/moderator');
+
+  const isManagementUser =
+    user?.role === 'super_admin' ||
+    user?.role === 'admin' ||
+    user?.role === 'moderator' ||
+    user?.roles?.includes('super_admin') ||
+    user?.roles?.includes('admin') ||
+    user?.roles?.includes('moderator');
+
+  const hidePostAdButton = isManagementRoute || isManagementUser;
+
+  const getDashboardSubtitle = () => {
+    if (location.pathname.startsWith('/superadmin') || user?.roles?.includes('super_admin') || user?.role === 'super_admin') {
+      return 'Super Admin';
+    }
+    if (location.pathname.startsWith('/admin') || user?.roles?.includes('admin') || user?.role === 'admin') {
+      return 'Admin Panel';
+    }
+    if (location.pathname.startsWith('/moderator') || user?.roles?.includes('moderator') || user?.role === 'moderator') {
+      return 'Moderator Workspace';
+    }
+    return 'User Dashboard';
+  };
+
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">
       {/* Brand Header */}
       <div className="p-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5 group min-w-0">
+        <Link to={isManagementRoute ? location.pathname : '/'} className="flex items-center gap-2.5 group min-w-0">
           <div className="w-8 h-8 rounded-xl overflow-hidden bg-slate-900 border border-slate-200 dark:border-slate-700 p-0.5 shadow-sm shrink-0">
             <img src="/logo.png" alt="All in one" className="w-full h-full object-cover rounded-lg" />
           </div>
@@ -113,7 +141,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, navItems, t
                 All in one
               </span>
               <span className="text-[9px] uppercase font-bold text-primary-600 dark:text-primary-400 tracking-wider">
-                User Dashboard
+                {getDashboardSubtitle()}
               </span>
             </div>
           )}
@@ -310,14 +338,16 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, navItems, t
               {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} />}
             </button>
 
-            {/* Quick Post Ad CTA */}
-            <Link
-              to="/dashboard/listings/new"
-              className="px-3.5 sm:px-4 py-2 bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md shadow-primary-600/25 transition-all flex items-center gap-1.5"
-            >
-              <Plus size={15} className="stroke-[3]" />
-              <span>Post New Ad</span>
-            </Link>
+            {/* Quick Post Ad CTA (Hidden for Admin, Super Admin, and Moderator) */}
+            {!hidePostAdButton && (
+              <Link
+                to="/dashboard/listings/new"
+                className="px-3.5 sm:px-4 py-2 bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md shadow-primary-600/25 transition-all flex items-center gap-1.5"
+              >
+                <Plus size={15} className="stroke-[3]" />
+                <span>Post New Ad</span>
+              </Link>
+            )}
           </div>
         </header>
 
