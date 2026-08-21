@@ -325,9 +325,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
-                            'Explore Categories',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                          const Expanded(
+                            child: Text(
+                              'Explore Categories',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                            ),
                           ),
                           TextButton(
                             onPressed: () {
@@ -336,6 +340,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 MaterialPageRoute(builder: (_) => const CategoriesScreen()),
                               );
                             },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              visualDensity: VisualDensity.compact,
+                            ),
                             child: const Text('See All →', style: TextStyle(fontWeight: FontWeight.w600)),
                           ),
                         ],
@@ -418,11 +426,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: const Icon(Icons.star, color: Colors.amber, size: 18),
                             ),
                             const SizedBox(width: 8),
-                            const Text(
-                              'Featured Listings',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                            const Expanded(
+                              child: Text(
+                                'Featured Listings',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                              ),
                             ),
-                            const Spacer(),
+                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
@@ -469,32 +481,43 @@ class _HomeScreenState extends State<HomeScreen> {
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 16),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(6),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primaryColor.withOpacity(0.12),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Icon(
-                                          _getCategoryIcon(cat.name),
-                                          color: AppTheme.primaryColor,
-                                          size: 18,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        cat.name,
-                                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                                      ),
-                                    ],
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryColor.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      _getCategoryIcon(cat.name),
+                                      color: AppTheme.primaryColor,
+                                      size: 18,
+                                    ),
                                   ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      cat.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
                                   TextButton(
                                     onPressed: () => _navigateToCategory(cat),
-                                    child: const Text('View All →', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text('View All', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                        SizedBox(width: 2),
+                                        Icon(Icons.arrow_forward, size: 14),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
