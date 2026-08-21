@@ -62,4 +62,13 @@ class PasswordResetSent extends AuthState {
   List<Object?> get props => [email];
 }
 
+class PasswordRecoveryMode extends AuthState {
+  final String email;
+
+  const PasswordRecoveryMode({required this.email});
+
+  @override
+  List<Object?> get props => [email];
+}
+
 class PasswordUpdated extends AuthState {}

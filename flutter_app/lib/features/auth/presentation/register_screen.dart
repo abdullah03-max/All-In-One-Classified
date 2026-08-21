@@ -120,7 +120,9 @@ class _RegisterScreenState extends State<RegisterScreen> with WidgetsBindingObse
               );
             } else if (state is Authenticated) {
               setState(() => _isGoogleSigningIn = false);
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
             }
           },
           builder: (context, state) {

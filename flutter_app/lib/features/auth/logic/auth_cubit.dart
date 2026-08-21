@@ -7,6 +7,13 @@ import 'auth_state.dart';
 class AuthCubit extends Cubit<AuthState> {
   final AuthRepository _repository;
   StreamSubscription<AuthState>? _authSubscription;
+  bool _isRecoveringPassword = false;
+
+  bool get isRecoveringPassword => _isRecoveringPassword;
+
+  void setPasswordRecoveryMode(bool active) {
+    _isRecoveringPassword = active;
+  }
 
   AuthCubit(this._repository) : super(AuthInitial()) {
     _initAuthListener();
@@ -14,13 +21,18 @@ class AuthCubit extends Cubit<AuthState> {
 
   void _initAuthListener() {
     final currentUser = _repository.currentAuthUser;
-    if (currentUser != null) {
+    if (currentUser != null && !_isRecoveringPassword) {
       _loadUserProfile(currentUser.id, currentUser.email ?? '');
     } else {
       emit(Unauthenticated());
     }
 
     _repository.authStateChanges.listen((data) async {
+      if (_isRecoveringPassword) {
+        // While user is entering OTP or setting a new password, ignore background auth changes
+        return;
+      }
+
       final session = data.session;
       if (session != null) {
         await _repository.ensureProfile(session.user);
@@ -155,6 +167,10 @@ class AuthCubit extends Cubit<AuthState> {
   }) async {
     emit(AuthLoading());
     try {
+      if (type == OtpType.recovery) {
+        _isRecoveringPassword = true;
+      }
+
       final response = await _repository.verifyOtp(
         email: email,
         token: token,
@@ -162,7 +178,10 @@ class AuthCubit extends Cubit<AuthState> {
       );
 
       if (response.user != null) {
-        if (type != OtpType.recovery) {
+        if (type == OtpType.recovery) {
+          emit(PasswordRecoveryMode(email: email));
+        } else {
+          _isRecoveringPassword = false;
           await _loadUserProfile(response.user!.id, response.user!.email ?? '');
         }
         return true;
@@ -185,6 +204,9 @@ class AuthCubit extends Cubit<AuthState> {
     required OtpType type,
   }) async {
     try {
+      if (type == OtpType.recovery) {
+        _isRecoveringPassword = true;
+      }
       await _repository.resendOtp(email: email, type: type);
     } on AuthException catch (e) {
       emit(AuthError(e.message));
@@ -197,6 +219,7 @@ class AuthCubit extends Cubit<AuthState> {
   Future<bool> resetPassword(String email) async {
     emit(AuthLoading());
     try {
+      _isRecoveringPassword = true;
       await _repository.resetPassword(email: email);
       emit(PasswordResetSent(email));
       return true;
@@ -214,6 +237,8 @@ class AuthCubit extends Cubit<AuthState> {
     emit(AuthLoading());
     try {
       await _repository.updatePassword(newPassword: newPassword);
+      _isRecoveringPassword = false;
+      await _repository.signOut();
       emit(PasswordUpdated());
       return true;
     } on AuthException catch (e) {

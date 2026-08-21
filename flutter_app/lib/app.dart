@@ -53,18 +53,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void initState() {
     super.initState();
     PushNotificationService.initialize(navigatorKey: navigatorKey);
-
-    // Listen to Supabase Auth state changes for password recovery via deep link
-    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      if (data.event == AuthChangeEvent.passwordRecovery) {
-        debugPrint('[Auth] Password recovery event detected');
-        navigatorKey.currentState?.push(
-          MaterialPageRoute(
-            builder: (_) => const ResetPasswordScreen(),
-          ),
-        );
-      }
-    });
   }
 
   final List<Widget> _screens = const [

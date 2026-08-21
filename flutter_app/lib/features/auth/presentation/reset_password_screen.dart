@@ -53,9 +53,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           ),
         );
 
-        // Sign out temporary session and navigate to Login
-        await context.read<AuthCubit>().logout();
-
         if (mounted) {
           Navigator.pushAndRemoveUntil(
             context,

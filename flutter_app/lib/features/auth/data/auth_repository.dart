@@ -95,7 +95,7 @@ class AuthRepository {
       type: type,
     );
 
-    if (response.user != null) {
+    if (response.user != null && type != OtpType.recovery) {
       await ensureProfile(response.user!);
     }
 
@@ -108,7 +108,12 @@ class AuthRepository {
     required OtpType type,
   }) async {
     final cleanEmail = email.trim().toLowerCase();
-    if (type == OtpType.email) {
+    if (type == OtpType.recovery) {
+      await _client.auth.resetPasswordForEmail(
+        cleanEmail,
+        redirectTo: 'allinoneclassified://reset-password',
+      );
+    } else if (type == OtpType.email) {
       await _client.auth.signInWithOtp(
         email: cleanEmail,
         emailRedirectTo: 'allinoneclassified://login-callback',
@@ -124,8 +129,9 @@ class AuthRepository {
 
   /// Reset password link / recovery code dispatch
   Future<void> resetPassword({required String email}) async {
+    final cleanEmail = email.trim().toLowerCase();
     await _client.auth.resetPasswordForEmail(
-      email.trim(),
+      cleanEmail,
       redirectTo: 'allinoneclassified://reset-password',
     );
   }

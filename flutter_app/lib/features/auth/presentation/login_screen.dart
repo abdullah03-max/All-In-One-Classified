@@ -145,8 +145,10 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
               }
             } else if (state is Authenticated) {
               setState(() => _isGoogleSigningIn = false);
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
+              if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                }
               }
             }
           },
