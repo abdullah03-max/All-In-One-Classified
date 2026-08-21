@@ -248,63 +248,110 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                                     ),
                                     const Divider(height: 16),
 
-                                    // Action Buttons Bar with Horizontal Scroll to prevent ANY overflow
-                                    SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.end,
-                                        children: [
-                                          TextButton.icon(
-                                            onPressed: () async {
-                                              final promoted = await Navigator.push<bool>(
-                                                context,
-                                                MaterialPageRoute(builder: (_) => PromoteListingScreen(listing: listing)),
-                                              );
-                                              if (promoted == true) _fetchMyListings();
-                                            },
-                                            icon: const Icon(Icons.rocket_launch, size: 15, color: Colors.amber),
-                                            label: const Text('Promote', style: TextStyle(color: Colors.amber, fontSize: 12)),
-                                          ),
-                                          TextButton.icon(
-                                            onPressed: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(builder: (_) => ListingDetailScreen(listing: listing)),
-                                              );
-                                            },
-                                            icon: const Icon(Icons.remove_red_eye, size: 15),
-                                            label: const Text('View', style: TextStyle(fontSize: 12)),
-                                          ),
-                                          TextButton.icon(
-                                            onPressed: () async {
-                                              final updated = await Navigator.push<bool>(
-                                                context,
-                                                MaterialPageRoute(builder: (_) => EditListingScreen(listing: listing)),
-                                              );
-                                              if (updated == true) _fetchMyListings();
-                                            },
-                                            icon: const Icon(Icons.edit, size: 15),
-                                            label: const Text('Edit', style: TextStyle(fontSize: 12)),
-                                          ),
-                                          if (listing.status == 'active')
-                                            TextButton.icon(
-                                              onPressed: () => _markStatus(listing.id, 'sold'),
-                                              icon: const Icon(Icons.check_circle_outline, size: 15, color: Colors.blue),
-                                              label: const Text('Mark Sold', style: TextStyle(color: Colors.blue, fontSize: 12)),
-                                            )
-                                          else if (listing.status == 'sold')
-                                            TextButton.icon(
-                                              onPressed: () => _markStatus(listing.id, 'active'),
-                                              icon: const Icon(Icons.refresh, size: 15, color: Color(0xFF10B981)),
-                                              label: const Text('Re-activate', style: TextStyle(color: Color(0xFF10B981), fontSize: 12)),
+                                    // Action Buttons: 2 clear rows so Delete and all actions are always 100% visible
+                                    Column(
+                                      children: [
+                                        Row(
+                                          children: [
+                                            // Promote CTA
+                                            InkWell(
+                                              onTap: () async {
+                                                final promoted = await Navigator.push<bool>(
+                                                  context,
+                                                  MaterialPageRoute(builder: (_) => PromoteListingScreen(listing: listing)),
+                                                );
+                                                if (promoted == true) _fetchMyListings();
+                                              },
+                                              borderRadius: BorderRadius.circular(8),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.amber.withOpacity(0.15),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                                                ),
+                                                child: const Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.rocket_launch, size: 14, color: Colors.amber),
+                                                    SizedBox(width: 4),
+                                                    Text('Promote', style: TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold)),
+                                                  ],
+                                                ),
+                                              ),
                                             ),
-                                          TextButton.icon(
-                                            onPressed: () => _deleteListing(listing.id),
-                                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 15),
-                                            label: const Text('Delete', style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
-                                          ),
-                                        ],
-                                      ),
+                                            const Spacer(),
+                                            // View Button
+                                            TextButton.icon(
+                                              onPressed: () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(builder: (_) => ListingDetailScreen(listing: listing)),
+                                                );
+                                              },
+                                              icon: const Icon(Icons.remove_red_eye, size: 14),
+                                              label: const Text('View', style: TextStyle(fontSize: 12)),
+                                              style: TextButton.styleFrom(
+                                                visualDensity: VisualDensity.compact,
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              ),
+                                            ),
+                                            // Edit Button
+                                            TextButton.icon(
+                                              onPressed: () async {
+                                                final updated = await Navigator.push<bool>(
+                                                  context,
+                                                  MaterialPageRoute(builder: (_) => EditListingScreen(listing: listing)),
+                                                );
+                                                if (updated == true) _fetchMyListings();
+                                              },
+                                              icon: const Icon(Icons.edit, size: 14),
+                                              label: const Text('Edit', style: TextStyle(fontSize: 12)),
+                                              style: TextButton.styleFrom(
+                                                visualDensity: VisualDensity.compact,
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            // Mark Sold / Re-activate
+                                            if (listing.status == 'active')
+                                              TextButton.icon(
+                                                onPressed: () => _markStatus(listing.id, 'sold'),
+                                                icon: const Icon(Icons.check_circle_outline, size: 14, color: Colors.blue),
+                                                label: const Text('Mark Sold', style: TextStyle(color: Colors.blue, fontSize: 12)),
+                                                style: TextButton.styleFrom(
+                                                  visualDensity: VisualDensity.compact,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                ),
+                                              )
+                                            else if (listing.status == 'sold')
+                                              TextButton.icon(
+                                                onPressed: () => _markStatus(listing.id, 'active'),
+                                                icon: const Icon(Icons.refresh, size: 14, color: Color(0xFF10B981)),
+                                                label: const Text('Re-activate', style: TextStyle(color: Color(0xFF10B981), fontSize: 12)),
+                                                style: TextButton.styleFrom(
+                                                  visualDensity: VisualDensity.compact,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                ),
+                                              ),
+                                            const Spacer(),
+                                            // Delete Button (Always prominent & accessible)
+                                            TextButton.icon(
+                                              onPressed: () => _deleteListing(listing.id),
+                                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 15),
+                                              label: const Text('Delete', style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                                              style: TextButton.styleFrom(
+                                                visualDensity: VisualDensity.compact,
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),

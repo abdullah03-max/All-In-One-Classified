@@ -163,9 +163,11 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
     final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
     final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
+    final isRecovery = widget.type == OtpType.recovery;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Verify Email'),
+        title: Text(isRecovery ? 'Verify Reset Code' : 'Verify Email'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -183,8 +185,8 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                   color: AppTheme.primaryColor.withOpacity(0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.mark_email_read_outlined,
+                child: Icon(
+                  isRecovery ? Icons.lock_reset : Icons.mark_email_read_outlined,
                   size: 40,
                   color: AppTheme.primaryColor,
                 ),
@@ -192,7 +194,7 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
               const SizedBox(height: 24),
 
               Text(
-                'Verify your Email',
+                isRecovery ? 'Password Reset OTP' : 'Verify your Email',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -202,7 +204,9 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
               const SizedBox(height: 8),
 
               Text(
-                "We've sent a 6-digit verification code to",
+                isRecovery
+                    ? "We've sent a 6-digit password reset code to"
+                    : "We've sent a 6-digit verification code to",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
@@ -298,12 +302,15 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Row(
+                              : Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Text('Verify Code', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                                    SizedBox(width: 8),
-                                    Icon(Icons.arrow_forward, size: 18),
+                                    Text(
+                                      isRecovery ? 'Verify & Set Password' : 'Verify Code',
+                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Icon(Icons.arrow_forward, size: 18),
                                   ],
                                 ),
                         ),
