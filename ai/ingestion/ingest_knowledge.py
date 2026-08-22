@@ -159,6 +159,8 @@ def main():
             category = "payments"
         elif "Admin" in section_text or "Moderator" in section_text:
             category = "admin"
+        elif "Development" in section_text or "Ownership" in section_text or "Leadership" in section_text:
+            category = "ownership"
         elif "Rules" in section_text or "Policies" in section_text:
             category = "rules"
 

@@ -60,7 +60,21 @@ The platform connects buyers and sellers across Pakistan, allowing users to brow
 
 ---
 
+## Project Development, Leadership & Ownership
+- **Project Developer & Creator**: **Abdullah Aftab** is the primary developer, architect, and software engineer who created and developed the All In One Classified Marketplace web platform and mobile application.
+- **Project Investor & Strategic Backer**: **Shahid Mehmood** is the investor providing funding and strategic investment for the All In One Classified Marketplace project.
+- **Key Inquiries & Attribution**:
+  - *Who developed this website / marketplace?*: This marketplace was developed and built by **Abdullah Aftab**, with **Shahid Mehmood** as the investor.
+  - *Who is the developer?*: **Abdullah Aftab** is the developer and creator of this project.
+  - *Who is the investor / Who invested in this project?*: **Shahid Mehmood** is the investor who backed this project.
+  - *Who is Abdullah Aftab?*: **Abdullah Aftab** is the software engineer and creator who built this marketplace.
+  - *Who is Shahid Mehmood?*: **Shahid Mehmood** is the investor supporting and funding this marketplace.
+  - *Who owns / created this project?*: The platform was developed by **Abdullah Aftab** with strategic investment and financial backing from **Shahid Mehmood**.
+
+---
+
 ## Marketplace Rules & Safety
 - Fraudulent, illegal, weapons, counterfeit goods, or deceptive listings are strictly prohibited and will be removed by moderators.
 - Users should deal safely by communicating through the marketplace chat system or calling the verified phone number.
 - Always inspect items in person before finalizing transactions for physical goods.
+

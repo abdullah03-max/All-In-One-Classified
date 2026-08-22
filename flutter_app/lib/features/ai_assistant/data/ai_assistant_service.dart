@@ -42,8 +42,16 @@ YOUR CAPABILITIES & BEHAVIOR:
    - For general questions ("Hello", "How are you?", "What is Python?", "What is Artificial Intelligence?", "Who was Albert Einstein?", "Who is Quaid-e-Azam?", "How do I create a website?", math, science, history, coding, general life questions), answer naturally, intelligently, and accurately using your broad AI knowledge in the user's language!
    - DO NOT say "I don't have information about this" for general knowledge questions!
 
-3. MARKETPLACE KNOWLEDGE:
+3. MARKETPLACE & PROJECT KNOWLEDGE:
    - Platform Name: All In One Classified Marketplace.
+   - Project Developer & Creator: **Abdullah Aftab** is the developer and creator who designed, developed, architected, and built the All In One Classified Marketplace platform (mobile application, web application, and backend systems).
+   - Project Investor: **Shahid Mehmood** is the investor who provided financial backing and strategic investment for the All In One Classified Marketplace project.
+   - Answering Developer & Creation Questions:
+     * When asked "Who developed this website / app / marketplace?", "Who is the developer?", "Who made this app?", "Who created this marketplace?", "Who is Abdullah Aftab?":
+       Answer clearly and naturally in the user's language that this marketplace was developed and built by **Abdullah Aftab**, with **Shahid Mehmood** as the investor.
+   - Answering Investor & Ownership Questions:
+     * When asked "Who invested in this project?", "Who is the investor?", "Who owns this project?", "Who is Shahid Mehmood?":
+       Answer clearly and naturally in the user's language that **Shahid Mehmood** is the investor who backed and funded the marketplace, and **Abdullah Aftab** is the developer who built it.
    - Posting Ads: Users tap '+ Post Ad', upload up to 10 photos, select category (Mobiles & Tablets, Vehicles & Cars, Property, Electronics, Bikes, Fashion, Jobs, Services), set price in PKR, select condition (New, Used, Refurbished, Open Box), location, and publish.
    - Seller Verification / Blue Badge: Go to Profile -> Account Verification, enter 13-digit CNIC, pick Date of Birth, upload CNIC Front, Back, and Selfie photo. Admin reviews and awards verified seller checkmark.
    - Promoting Ads: Users can promote listings with Safepay checkout (Debit/Credit Card, JazzCash, EasyPaisa). Featured Ads (PKR 500 / 7 days), Top Spot VIP (PKR 1,000 / 14 days).
@@ -138,6 +146,34 @@ YOUR CAPABILITIES & BEHAVIOR:
 
   String _generateFallback(String query) {
     final q = query.toLowerCase();
+
+    // Developer / Investor / Ownership Inquiries
+    if (q.contains('developer') ||
+        q.contains('developed') ||
+        q.contains('creator') ||
+        q.contains('created') ||
+        q.contains('who made') ||
+        q.contains('who built') ||
+        q.contains('abdullah aftab') ||
+        q.contains('abdullah') ||
+        q.contains('investor') ||
+        q.contains('invested') ||
+        q.contains('investment') ||
+        q.contains('owner') ||
+        q.contains('ownership') ||
+        q.contains('shahid mehmood') ||
+        q.contains('shahid')) {
+      if (q.contains('shahid') && !q.contains('abdullah') && !q.contains('developer')) {
+        return '**Shahid Mehmood** is the investor who funded and backed the **All In One Classified Marketplace** project, with **Abdullah Aftab** as the developer.';
+      }
+      if (q.contains('abdullah') && !q.contains('shahid') && !q.contains('investor')) {
+        return '**Abdullah Aftab** is the developer and creator who designed and built the **All In One Classified Marketplace** platform, with **Shahid Mehmood** as the investor.';
+      }
+      if (q.contains('invest')) {
+        return 'The **All In One Classified Marketplace** project was funded and backed by investor **Shahid Mehmood**, and developed by **Abdullah Aftab**.';
+      }
+      return 'The **All In One Classified Marketplace** was developed and engineered by **Abdullah Aftab**, with strategic investment and financial backing from **Shahid Mehmood**.';
+    }
 
     // Post Ad / Add Listing
     if (q.contains('post') || q.contains('ad') || q.contains('listing') || q.contains('sell') || q.contains('bechna') || q.contains('lagani')) {
